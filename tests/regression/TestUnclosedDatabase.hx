@@ -5,6 +5,8 @@ import haxe.Exception;
 import sqlite.SQLite;
 import sqlite.SQLiteDatabase;
 import sys.FileSystem;
+import sys.thread.Lock;
+import sys.thread.Thread;
 import utest.Assert;
 import utest.Test;
 
@@ -30,14 +32,10 @@ class TestUnclosedDatabase extends Test {
 
 	function testLockReleasedByGarbageCollection() {
 		var path = createDatabase("unclosed-gc.db");
-		lockAndDrop(path);
-		// Proves the dropped connection still holds the lock. This call also overwrites any stale copy of the
-		// connection pointer left on the stack, which hxcpp's conservative stack scan would treat as a reference.
+		lockAndDropInThread(path);
+		// Proves the dropped connection still holds the lock.
 		Assert.isFalse(canWrite(path));
-		// Two major collections, so objects freed by the first collection's finalizers are also collected.
-		Gc.run(true);
-		Gc.run(true);
-		Assert.isTrue(canWrite(path));
+		Assert.isTrue(collectUntilWritable(path));
 		deleteDatabase(path);
 	}
 
@@ -55,9 +53,39 @@ class TestUnclosedDatabase extends Test {
 		return db;
 	}
 
-	// A separate function, so no reference to the database stays in the calling test's stack frame.
-	static function lockAndDrop(path:String):Void {
-		lockDatabase(path);
+	/**
+	 * Opens and drops the connection on a worker thread. hxcpp scans every registered thread's stack
+	 * conservatively, so a stale copy of the connection pointer on a live stack would keep it alive. Once the
+	 * worker exits its stack is no longer scanned, and the main thread never held a reference.
+	 */
+	static function lockAndDropInThread(path:String):Void {
+		var done = new Lock();
+		var error:Null<Exception> = null;
+		Thread.create(() -> {
+			try {
+				lockDatabase(path);
+			} catch (e:Exception) {
+				error = e;
+			}
+			done.release();
+		});
+		done.wait();
+		if (error != null) throw error;
+	}
+
+	/**
+	 * Runs major collections until another connection can write, for up to about 5 seconds. Retrying covers
+	 * the short time between the worker signalling and the worker thread being unregistered.
+	 */
+	static function collectUntilWritable(path:String):Bool {
+		for (_ in 0...500) {
+			// Two major collections, so objects freed by the first collection's finalizers are also collected.
+			Gc.run(true);
+			Gc.run(true);
+			if (canWrite(path)) return true;
+			Sys.sleep(0.01);
+		}
+		return false;
 	}
 
 	static function canWrite(path:String):Bool {

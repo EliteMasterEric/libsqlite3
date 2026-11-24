@@ -31,6 +31,7 @@ class TestAll {
 		runner.addCase(new TestBindBytes());
 		runner.addCase(new TestQueryErrors());
 		runner.addCase(new TestUnclosedDatabase());
+		runner.addCase(new TestNullBind());
 
 		Report.create(runner, SuccessResultsDisplayMode.AlwaysShowSuccessResults, HeaderDisplayMode.NeverShowHeader);
 		runner.run();

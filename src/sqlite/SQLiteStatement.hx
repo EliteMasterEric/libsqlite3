@@ -107,8 +107,12 @@ class SQLiteStatement extends Finalizable {
 		return this;
 	}
 
-	public function bindString(index:Int, value:String):SQLiteStatement {
+	/**
+	 * Binds `value` as TEXT, or `NULL` if `value` is null.
+	 */
+	public function bindString(index:Int, value:Null<String>):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
+		if (value == null) return bindNull(index);
 
 		// Bind the full UTF-8 encoding with its length, so text containing NUL characters is not cut short.
 		// (The implicit `ConstCharStar` conversion stops at the first NUL for non-ASCII strings.)
@@ -125,8 +129,12 @@ class SQLiteStatement extends Finalizable {
 		return this;
 	}
 
-	public function bindBytes(index:Int, value:Bytes):SQLiteStatement {
+	/**
+	 * Binds `value` as a BLOB, or `NULL` if `value` is null.
+	 */
+	public function bindBytes(index:Int, value:Null<Bytes>):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
+		if (value == null) return bindNull(index);
 
 		var result:SQLiteResultCode;
 		if (value.length == 0) {
@@ -136,6 +144,15 @@ class SQLiteStatement extends Finalizable {
 			var p:Pointer<cpp.Void> = NativeArray.address(value.getData(), 0).reinterpret();
 			result = sqlite3_bind_blob(statement.raw, index, p.raw, value.length, SQLITE_TRANSIENT);
 		}
+		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		return this;
+	}
+
+	/**
+	 * Binds a value at a given index as `NULL`.
+	 */
+	private function bindNull(index:Int):SQLiteStatement {
+		var result:SQLiteResultCode = sqlite3_bind_null(statement.raw, index);
 		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 		return this;
 	}
