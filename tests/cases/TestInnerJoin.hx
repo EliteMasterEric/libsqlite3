@@ -4,7 +4,6 @@ import cases.util.RecordUtils;
 import sqlite.SQLite;
 import utest.Assert;
 import cases.util.DBCreator;
-import utest.Async;
 import utest.Test;
 
 class TestInnerJoin extends Test {
@@ -12,12 +11,7 @@ class TestInnerJoin extends Test {
 		DBCreator.create();
 	}
 
-	function teardownClass(async:Async) {
-		DBCreator.delete();
-		async.done();
-	}
-
-	function testBasicInnerJoin(async:Async) {
+	function testBasicInnerJoin() {
 		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
@@ -26,23 +20,22 @@ class TestInnerJoin extends Test {
 
 		Assert.equals(4, rs.length);
 
-		Assert.equals(rs[0].personId, 1);
-		Assert.equals(rs[0].firstName, "Ian");
-		Assert.equals(rs[0].lastName, "Harrigan");
-		Assert.equals(rs[0].iconId, 1);
-		Assert.equals(rs[0].path, "/somepath/icon1.png");
+		Assert.equals(1, rs[0].personId);
+		Assert.equals("Ian", rs[0].firstName);
+		Assert.equals("Harrigan", rs[0].lastName);
+		Assert.equals(1, rs[0].iconId);
+		Assert.equals("/somepath/icon1.png", rs[0].path);
 
-		Assert.equals(rs[2].personId, 3);
-		Assert.equals(rs[2].firstName, "Tim");
-		Assert.equals(rs[2].lastName, "Mallot");
-		Assert.equals(rs[2].iconId, 2);
-		Assert.equals(rs[2].path, "/somepath/icon2.png");
+		Assert.equals(3, rs[2].personId);
+		Assert.equals("Tim", rs[2].firstName);
+		Assert.equals("Mallot", rs[2].lastName);
+		Assert.equals(2, rs[2].iconId);
+		Assert.equals("/somepath/icon2.png", rs[2].path);
 
 		db.close();
-		async.done();
 	}
 
-	function testBasicInnerJoinWhere(async:Async) {
+	function testBasicInnerJoinWhere() {
 		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
@@ -51,17 +44,16 @@ class TestInnerJoin extends Test {
 
 		Assert.equals(1, rs.length);
 
-		Assert.equals(rs[0].personId, 1);
-		Assert.equals(rs[0].firstName, "Ian");
-		Assert.equals(rs[0].lastName, "Harrigan");
-		Assert.equals(rs[0].iconId, 1);
-		Assert.equals(rs[0].path, "/somepath/icon1.png");
+		Assert.equals(1, rs[0].personId);
+		Assert.equals("Ian", rs[0].firstName);
+		Assert.equals("Harrigan", rs[0].lastName);
+		Assert.equals(1, rs[0].iconId);
+		Assert.equals("/somepath/icon1.png", rs[0].path);
 
 		db.close();
-		async.done();
 	}
 
-	function testBasicInnerJoinWhereOr(async:Async) {
+	function testBasicInnerJoinWhereOr() {
 		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
@@ -70,23 +62,22 @@ class TestInnerJoin extends Test {
 
 		Assert.equals(2, rs.length);
 
-		Assert.equals(rs[0].personId, 1);
-		Assert.equals(rs[0].firstName, "Ian");
-		Assert.equals(rs[0].lastName, "Harrigan");
-		Assert.equals(rs[0].iconId, 1);
-		Assert.equals(rs[0].path, "/somepath/icon1.png");
+		Assert.equals(1, rs[0].personId);
+		Assert.equals("Ian", rs[0].firstName);
+		Assert.equals("Harrigan", rs[0].lastName);
+		Assert.equals(1, rs[0].iconId);
+		Assert.equals("/somepath/icon1.png", rs[0].path);
 
-		Assert.equals(rs[1].personId, 4);
-		Assert.equals(rs[1].firstName, "Jim");
-		Assert.equals(rs[1].lastName, "Parker");
-		Assert.equals(rs[1].iconId, 1);
-		Assert.equals(rs[1].path, "/somepath/icon1.png");
+		Assert.equals(4, rs[1].personId);
+		Assert.equals("Jim", rs[1].firstName);
+		Assert.equals("Parker", rs[1].lastName);
+		Assert.equals(1, rs[1].iconId);
+		Assert.equals("/somepath/icon1.png", rs[1].path);
 
 		db.close();
-		async.done();
 	}
 
-	function testBasicInnerJoinWhereAnd(async:Async) {
+	function testBasicInnerJoinWhereAnd() {
 		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
@@ -95,13 +86,12 @@ class TestInnerJoin extends Test {
 
 		Assert.equals(1, rs.length);
 
-		Assert.equals(rs[0].personId, 1);
-		Assert.equals(rs[0].firstName, "Ian");
-		Assert.equals(rs[0].lastName, "Harrigan");
-		Assert.equals(rs[0].iconId, 1);
-		Assert.equals(rs[0].path, "/somepath/icon1.png");
+		Assert.equals(1, rs[0].personId);
+		Assert.equals("Ian", rs[0].firstName);
+		Assert.equals("Harrigan", rs[0].lastName);
+		Assert.equals(1, rs[0].iconId);
+		Assert.equals("/somepath/icon1.png", rs[0].path);
 
 		db.close();
-		async.done();
 	}
 }

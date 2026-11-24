@@ -2,7 +2,6 @@ package cases.util;
 
 import sqlite.SQLite;
 import sys.io.File;
-import sys.FileSystem;
 
 class DBCreator {
 	public static function create(createDummyData:Bool = true):Void {
@@ -84,9 +83,5 @@ class DBCreator {
 		db.prepare("COMMIT;").executeStatement();
 
 		db.close();
-	}
-
-	public static function delete() {
-		// FileSystem.deleteFile("persons.db");
 	}
 }

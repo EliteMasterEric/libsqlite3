@@ -1,4 +1,4 @@
 build/
-persons.db
-persons.db-journal
+*.db
+*.db-journal
 .vscode/

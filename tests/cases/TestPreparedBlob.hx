@@ -6,19 +6,13 @@ import sqlite.SQLite;
 import utest.Assert;
 import utest.Test;
 import cases.util.DBCreator;
-import utest.Async;
 
 class TestPreparedBlob extends Test {
 	function setupClass() {
 		DBCreator.create();
 	}
 
-	function teardownClass(async:Async) {
-		DBCreator.delete();
-		async.done();
-	}
-
-	function testBasicBlobPreparedInsert(async:Async) {
+	function testBasicBlobPreparedInsert() {
 		var db = SQLite.open("persons.db");
 
 		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId, contractDocument) VALUES (?, ?, ?, X'746869732069732061206e657720636f6e747261637420646f63756d656e74')");
@@ -36,14 +30,13 @@ class TestPreparedBlob extends Test {
 
 		Assert.equals(1, rs.length);
 
-		Assert.equals(rs[0].personId, 5);
-		Assert.equals(rs[0].firstName, "new first name");
-		Assert.equals(rs[0].lastName, "new last name");
-		Assert.equals(rs[0].iconId, 1);
+		Assert.equals(5, rs[0].personId);
+		Assert.equals("new first name", rs[0].firstName);
+		Assert.equals("new last name", rs[0].lastName);
+		Assert.equals(1, rs[0].iconId);
 		Assert.isOfType(rs[0].contractDocument, Bytes);
 		Assert.equals(Bytes.ofString("this is a new contract document").toString(), rs[0].contractDocument.toString());
 
 		db.close();
-		async.done();
 	}
 }

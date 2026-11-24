@@ -65,41 +65,36 @@ class SQLiteStatement extends Finalizable {
 		this.statement = null;
 	}
 
-	// Throws instead of passing a null handle to SQLite after `close()`.
-	private function assertOpen():Void {
-		
-	}
-
 	public function reset():SQLiteStatement {
-		if (statement == null) throw "Statement is closed";
+		if (statement == null) throw new Exception("Statement is closed");
 		
 		sqlite3_reset(statement.raw);
 		return this;
 	}
 
 	public function bindInt(index:Int, value:Int):SQLiteStatement {
-		if (statement == null) throw "Statement is closed";
+		if (statement == null) throw new Exception("Statement is closed");
 
 		sqlite3_bind_int(statement.raw, index, value);
 		return this;
 	}
 
 	public function bindInt64(index:Int, value:Int64):SQLiteStatement {
-		if (statement == null) throw "Statement is closed";
+		if (statement == null) throw new Exception("Statement is closed");
 
 		sqlite3_bind_int64(statement.raw, index, value);
 		return this;
 	}
 
 	public function bindFloat(index:Int, value:Float):SQLiteStatement {
-		if (statement == null) throw "Statement is closed";
+		if (statement == null) throw new Exception("Statement is closed");
 
 		sqlite3_bind_double(statement.raw, index, value);
 		return this;
 	}
 
 	public function bindString(index:Int, value:String):SQLiteStatement {
-		if (statement == null) throw "Statement is closed";
+		if (statement == null) throw new Exception("Statement is closed");
 
 		// Bind the full UTF-8 encoding with its length, so text containing NUL characters is not cut short.
 		// (The implicit `ConstCharStar` conversion stops at the first NUL for non-ASCII strings.)
@@ -115,7 +110,7 @@ class SQLiteStatement extends Finalizable {
 	}
 
 	public function bindBytes(index:Int, value:Bytes):SQLiteStatement {
-		if (statement == null) throw "Statement is closed";
+		if (statement == null) throw new Exception("Statement is closed");
 
 		var len = value.length;
 		var p:Pointer<cpp.Void> = NativeArray.address(value.getData(), 0).reinterpret();
@@ -124,7 +119,7 @@ class SQLiteStatement extends Finalizable {
 	}
 
 	public function executeStatement() {
-		if (statement == null) throw "Statement is closed";
+		if (statement == null) throw new Exception("Statement is closed");
 
 		var i = sqlite3_step(statement.raw);
 		if (i != SQLite.DONE) {
@@ -133,7 +128,7 @@ class SQLiteStatement extends Finalizable {
 	}
 
 	public function executeQuery():Iterator<Dynamic> {
-		if (statement == null) throw "Statement is closed";
+		if (statement == null) throw new Exception("Statement is closed");
 
 		var columnCount = sqlite3_column_count(statement.raw);
 		var columnNames = new Vector<String>(columnCount);
@@ -146,7 +141,7 @@ class SQLiteStatement extends Finalizable {
 		return {
 			hasNext: () -> status == SQLite.ROW,
 			next: () -> {
-				if (statement == null) throw "Statement is closed";
+				if (statement == null) throw new Exception("Statement is closed");
 
 				switch (status) {
 					case SQLite.DONE:

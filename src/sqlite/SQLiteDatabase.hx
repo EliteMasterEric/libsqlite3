@@ -53,7 +53,7 @@ class SQLiteDatabase {
 	}
 
 	public function prepare(sql:String):SQLiteStatement {
-		if (db == null) throw "Database is closed";
+		if (db == null) throw new Exception("Database is closed");
 
 		var rawStatement:RawPointer<RawSQLiteStatement> = null;
 		var rawTail:ConstCharStar = null;
@@ -81,12 +81,12 @@ class SQLiteDatabase {
 	}
 
 	public function lastInsertRowId():Int64 {
-		if (db == null) throw "Database is closed";
+		if (db == null) throw new Exception("Database is closed");
 		return sqlite3_last_insert_rowid(db.raw);
 	}
 
 	public function changes():Int64 {
-		if (db == null) throw "Database is closed";
+		if (db == null) throw new Exception("Database is closed");
 		
 		return sqlite3_changes64(db.raw);
 	}

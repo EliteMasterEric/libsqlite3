@@ -4,7 +4,6 @@ import cases.util.RecordUtils;
 import sqlite.SQLite;
 import utest.Assert;
 import cases.util.DBCreator;
-import utest.Async;
 import utest.Test;
 
 class TestInsert extends Test {
@@ -12,12 +11,7 @@ class TestInsert extends Test {
 		DBCreator.create();
 	}
 
-	function teardownClass(async:Async) {
-		DBCreator.delete();
-		async.done();
-	}
-
-	function testBasicInsert(async:Async) {
+	function testBasicInsert() {
 		var db = SQLite.open("persons.db");
 
 		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId) VALUES ('new last name', 'new first name', 1)");
@@ -31,12 +25,11 @@ class TestInsert extends Test {
 
 		Assert.equals(1, rs.length);
 
-		Assert.equals(rs[0].personId, 5);
-		Assert.equals(rs[0].firstName, "new first name");
-		Assert.equals(rs[0].lastName, "new last name");
-		Assert.equals(rs[0].iconId, 1);
+		Assert.equals(5, rs[0].personId);
+		Assert.equals("new first name", rs[0].firstName);
+		Assert.equals("new last name", rs[0].lastName);
+		Assert.equals(1, rs[0].iconId);
 
 		db.close();
-		async.done();
 	}
 }
