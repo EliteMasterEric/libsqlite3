@@ -13,7 +13,7 @@ jobs:
         os:
           - ubuntu-latest
         haxe:
-          - 4.2.5
+          - 4.3.7
     with:
       runner-os: ${{ matrix.os }}
       haxe-version: ${{ matrix.haxe }}
@@ -21,10 +21,6 @@ jobs:
         utest
       test-cpp:  tests/common.hxml --class-path tests
 
+      # Test the checked-out commit, not a fresh clone of the library.
       before-tests: |
-        git clone https://github.com/core-haxe/promises
-        haxelib dev promises promises
-        git clone https://github.com/core-haxe/logging
-        haxelib dev logging logging
-        git clone https://github.com/core-haxe/libsqlite3
-        haxelib dev libsqlite3 libsqlite3
+        haxelib dev libsqlite3 .

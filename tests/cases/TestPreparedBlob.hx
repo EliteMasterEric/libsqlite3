@@ -9,17 +9,11 @@ import cases.util.DBCreator;
 import utest.Async;
 
 class TestPreparedBlob extends Test {
-	function setupClass(async:Async) {
-		logging.LogManager.instance.addAdaptor(new logging.adaptors.ConsoleLogAdaptor({
-			levels: [logging.LogLevel.Info, logging.LogLevel.Error]
-		}));
-		DBCreator.create().then(_ -> {
-			async.done();
-		});
+	function setupClass() {
+		DBCreator.create();
 	}
 
 	function teardownClass(async:Async) {
-		logging.LogManager.instance.clearAdaptors();
 		DBCreator.delete();
 		async.done();
 	}
