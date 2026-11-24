@@ -7,7 +7,19 @@ import sys.FileSystem;
 class DBCreator {
 	public static function create(createDummyData:Bool = true):Void {
 		File.saveContent("persons.db", "");
+		createTables();
+
+		if (createDummyData) {
+			addDummyData();
+		}
+	}
+
+	static function createTables():Void {
 		var db = Sqlite.open("persons.db");
+
+		// One transaction for all tables to make tests faster.
+		db.prepare("BEGIN;").executeStatement();
+
 		var stmt = db.prepare("CREATE TABLE Person (
                 personId INTEGER PRIMARY KEY AUTOINCREMENT,
                 lastName varchar(50),
@@ -36,15 +48,16 @@ class DBCreator {
             );");
 		stmt.executeStatement();
 
-		db.close();
+		db.prepare("COMMIT;").executeStatement();
 
-		if (createDummyData) {
-			addDummyData();
-		}
+		db.close();
 	}
 
 	public static function addDummyData():Void {
 		var db = Sqlite.open("persons.db");
+
+		// One transaction for all inserts to make tests faster.
+		db.prepare("BEGIN;").executeStatement();
 
 		db.prepare("INSERT INTO Icon (iconId, path) VALUES (1, '/somepath/icon1.png');").executeStatement();
 		db.prepare("INSERT INTO Icon (iconId, path) VALUES (2, '/somepath/icon2.png');").executeStatement();
@@ -67,6 +80,8 @@ class DBCreator {
 		db.prepare("INSERT INTO Person_Organization (Person_personId, Organization_organizationId) VALUES (4, 2);").executeStatement();
 		db.prepare("INSERT INTO Person_Organization (Person_personId, Organization_organizationId) VALUES (1, 3);").executeStatement();
 		db.prepare("INSERT INTO Person_Organization (Person_personId, Organization_organizationId) VALUES (4, 3);").executeStatement();
+
+		db.prepare("COMMIT;").executeStatement();
 
 		db.close();
 	}
