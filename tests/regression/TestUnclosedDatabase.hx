@@ -11,7 +11,7 @@ import utest.Assert;
 import utest.Test;
 
 /**
- * A database dropped without `close()` must release its connection, and any locks it holds, once it is
+ * A database or statement dropped without `close()` must release its handle, and any locks it holds, once it is
  * garbage collected.
  *
  * The check is whether a second connection can write: an exclusive lock held by a leaked connection makes
@@ -32,11 +32,40 @@ class TestUnclosedDatabase extends Test {
 
 	function testLockReleasedByGarbageCollection() {
 		var path = createDatabase("unclosed-gc.db");
-		lockAndDropInThread(path);
+		runInThread(() -> lockDatabase(path));
 		// Proves the dropped connection still holds the lock.
 		Assert.isFalse(canWrite(path));
 		Assert.isTrue(collectUntilWritable(path));
 		deleteDatabase(path);
+	}
+
+	// An unfinished query holds a read lock until its statement is finalized, which blocks other connections from
+	// committing. Dropping it relies on the statement's finalizer.
+	function testReadLockReleasedByGarbageCollection() {
+		var path = createDatabase("unclosed-read.db");
+		runInThread(() -> {
+			var db = SQLite.open(path);
+			db.prepare("INSERT INTO t (x) VALUES (1), (2), (3)").executeStatement();
+			db.prepare("SELECT x FROM t").executeQuery().next();
+		});
+		Assert.isFalse(canWrite(path));
+		Assert.isTrue(collectUntilWritable(path));
+		deleteDatabase(path);
+	}
+
+	// Collecting a database and statements that were already closed must not close them a second time.
+	function testClosedObjectsCollectedSafely() {
+		runInThread(() -> {
+			var db = SQLite.open(":memory:");
+			var stmt = db.prepare("SELECT 1");
+			stmt.executeQuery();
+			stmt.close();
+			db.prepare("SELECT 2");
+			db.close();
+		});
+		Gc.run(true);
+		Gc.run(true);
+		Assert.pass();
 	}
 
 	static function createDatabase(path:String):String {
@@ -54,16 +83,17 @@ class TestUnclosedDatabase extends Test {
 	}
 
 	/**
-	 * Opens and drops the connection on a worker thread. hxcpp scans every registered thread's stack
-	 * conservatively, so a stale copy of the connection pointer on a live stack would keep it alive. Once the
-	 * worker exits its stack is no longer scanned, and the main thread never held a reference.
+	 * Runs `action` on a worker thread, so the objects it creates and drops are referenced from no live stack.
+	 * hxcpp scans every registered thread's stack conservatively, so a stale copy of a pointer on a live stack
+	 * would keep its object alive. Once the worker exits its stack is no longer scanned, and the main thread
+	 * never held a reference.
 	 */
-	static function lockAndDropInThread(path:String):Void {
+	static function runInThread(action:() -> Void):Void {
 		var done = new Lock();
 		var error:Null<Exception> = null;
 		Thread.create(() -> {
 			try {
-				lockDatabase(path);
+				action();
 			} catch (e:Exception) {
 				error = e;
 			}

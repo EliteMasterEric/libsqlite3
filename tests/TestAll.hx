@@ -23,6 +23,8 @@ class TestAll {
 		runner.addCase(new TestErrors());
 		runner.addCase(new TestConnection());
 		runner.addCase(new TestErrorCodes());
+		runner.addCase(new TestUnicode());
+		runner.addCase(new TestStatementLifecycle());
 
 		runner.addCase(new TestUseAfterClose());
 		runner.addCase(new TestNoTruncation());

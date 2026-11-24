@@ -45,6 +45,37 @@ class TestErrorCodes extends Test {
 		db.close();
 	}
 
+	// Binding null takes a separate path (`sqlite3_bind_null`), which must report errors the same way.
+	function testBindNullOutOfRange() {
+		var db = SQLite.open(":memory:");
+		var stmt = db.prepare("SELECT ? AS v");
+		assertCodes(catchError(() -> stmt.bindString(2, null)), SQLiteResultCode.RANGE, SQLiteExtendedResultCode.RANGE);
+		assertCodes(catchError(() -> stmt.bindBytes(2, null)), SQLiteResultCode.RANGE, SQLiteExtendedResultCode.RANGE);
+		db.close();
+	}
+
+	function testExtendedCodeDefaultsToCode() {
+		var e = new SQLiteException("message", SQLiteResultCode.BUSY);
+		assertCodes(e, SQLiteResultCode.BUSY, SQLiteExtendedResultCode.BUSY);
+		Assert.equals("message", e.message);
+
+		var detailed = new SQLiteException("message", SQLiteResultCode.BUSY, SQLiteExtendedResultCode.BUSY_TIMEOUT);
+		assertCodes(detailed, SQLiteResultCode.BUSY, SQLiteExtendedResultCode.BUSY_TIMEOUT);
+	}
+
+	function testCodeConversions() {
+		Assert.equals(SQLiteResultCode.CONSTRAINT, SQLiteExtendedResultCode.CONSTRAINT_UNIQUE.toResultCode());
+		Assert.equals(SQLiteResultCode.IOERR, SQLiteExtendedResultCode.IOERR_CODEC.toResultCode());
+		Assert.equals(SQLiteResultCode.OK, SQLiteExtendedResultCode.OK_SYMLINK.toResultCode());
+		Assert.equals(SQLiteResultCode.DONE, SQLiteExtendedResultCode.DONE.toResultCode());
+		Assert.equals(SQLiteExtendedResultCode.BUSY, SQLiteResultCode.BUSY.toExtendedResultCode());
+
+		// Widening is implicit and keeps the value, so a widened primary code never equals a more specific one.
+		var widened:SQLiteExtendedResultCode = SQLiteResultCode.CONSTRAINT;
+		Assert.isTrue(widened == SQLiteExtendedResultCode.CONSTRAINT);
+		Assert.isFalse(widened == SQLiteExtendedResultCode.CONSTRAINT_UNIQUE);
+	}
+
 	function testFailedOpen() {
 		var e = catchError(() -> SQLite.open("missing-folder/sub/test.db"));
 		Assert.equals(SQLiteResultCode.CANTOPEN, e.code);

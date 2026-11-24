@@ -33,6 +33,31 @@ class TestTypes extends Test {
 		db.close();
 	}
 
+	function testFloatSpecialValues() {
+		var db = SQLite.open(":memory:");
+		var row:Dynamic = db.prepare("SELECT ? AS posInf, ? AS negInf, ? AS nan")
+			.bindFloat(1, Math.POSITIVE_INFINITY)
+			.bindFloat(2, Math.NEGATIVE_INFINITY)
+			.bindFloat(3, Math.NaN)
+			.executeQuery()
+			.next();
+		Assert.equals(Math.POSITIVE_INFINITY, row.posInf);
+		Assert.equals(Math.NEGATIVE_INFINITY, row.negInf);
+		// SQLite stores NaN as NULL.
+		Assert.isNull(row.nan);
+		db.close();
+	}
+
+	function testBindInt64() {
+		var db = SQLite.open(":memory:");
+		var big = haxe.Int64.make(0x12345678, 0x9abcdef0);
+		var row:Dynamic = db.prepare("SELECT ? AS big, ? AS small").bindInt64(1, big).bindInt64(2, 7).executeQuery().next();
+		Assert.isTrue(big == (row.big : haxe.Int64));
+		// A value that fits in 32 bits reads back as an Int, whichever bind method stored it.
+		Assert.equals(7, row.small);
+		db.close();
+	}
+
 	function testEmptyTextAndBlob() {
 		var db = SQLite.open(":memory:");
 		var row:Dynamic = db.prepare("SELECT '' AS text, x'' AS blob").executeQuery().next();

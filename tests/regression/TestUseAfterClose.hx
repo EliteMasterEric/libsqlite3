@@ -29,6 +29,30 @@ class TestUseAfterClose extends Test {
 		db.close();
 	}
 
+	function testDatabaseInfoAfterClose() {
+		var db = SQLite.open(":memory:");
+		db.close();
+
+		Assert.raises(() -> db.lastInsertRowId(), Exception);
+		Assert.raises(() -> db.changes(), Exception);
+	}
+
+	// Every bind method checks for a closed statement, including the null paths that bind NULL.
+	function testEveryBindAfterClose() {
+		var db = SQLite.open(":memory:");
+		var stmt = db.prepare("SELECT ?");
+		stmt.close();
+
+		Assert.raises(() -> stmt.bindInt64(1, 1), Exception);
+		Assert.raises(() -> stmt.bindFloat(1, 1.0), Exception);
+		Assert.raises(() -> stmt.bindString(1, "x"), Exception);
+		Assert.raises(() -> stmt.bindString(1, null), Exception);
+		Assert.raises(() -> stmt.bindBytes(1, haxe.io.Bytes.alloc(1)), Exception);
+		Assert.raises(() -> stmt.bindBytes(1, null), Exception);
+
+		db.close();
+	}
+
 	function testStatementAfterDatabaseClose() {
 		var db = SQLite.open(":memory:");
 		var stmt = db.prepare("SELECT ?");
