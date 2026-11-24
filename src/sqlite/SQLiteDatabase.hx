@@ -1,10 +1,11 @@
 package sqlite;
 
 #if cpp
+import cpp.Callable;
 import cpp.ConstCharStar;
-import cpp.Finalizable;
 import cpp.Pointer;
 import cpp.RawPointer;
+import cpp.vm.Gc;
 import haxe.Int64;
 import sqlite._internal.RawSQLite;
 import sqlite._internal.RawSQLite.*;
@@ -17,7 +18,7 @@ import sqlite._internal.RawSQLiteStatement;
  */
 @:unreflective
 @:allow(sqlite.SQLiteStatement)
-class SQLiteDatabase extends Finalizable {
+class SQLiteDatabase {
 	/**
 	 * The C extern to interact with the SQLite database.
 	 */
@@ -28,20 +29,26 @@ class SQLiteDatabase extends Finalizable {
 	 */
 	private var statements:Array<SQLiteStatement> = [];
 
-	public function new(db:Pointer<RawSQLite>) {
-		super();
+	/**
+	 * Use `SQLite.open(path)` to connect to a database.
+	 */
+	@:allow(sqlite.SQLite)
+	private function new(db:Pointer<RawSQLite>) {
 		this.db = db;
+				// Set a function to call when garbage collecting this object.
+		Gc.setFinalizer(this, Callable.fromStaticFunction(onCollected));
 	}
 
 	/**
-	 * Ensure garbage collection closes the connection.
+	 * Guarantee the extern statement gets finalized and cleaned up
+	 * when garbage collecting this object.
 	 */
-	public override function finalize() {
-		if (db != null) {
-			sqlite3_close_v2(db.raw);
-			db = null;
+	@:void
+	private static function onCollected(database:SQLiteDatabase):Void {
+		if (database.db != null) {
+			sqlite3_close_v2(database.db.raw);
+			database.db = null;
 		}
-		super.finalize();
 	}
 
 	/**

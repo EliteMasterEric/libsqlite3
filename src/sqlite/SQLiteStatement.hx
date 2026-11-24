@@ -10,7 +10,8 @@ import cpp.NativeArray;
 import haxe.io.Bytes;
 import haxe.Int64;
 import cpp.Pointer;
-import cpp.Finalizable;
+import cpp.Callable;
+import cpp.vm.Gc;
 import sqlite._internal.RawSQLite.*;
 import sqlite._internal.RawSQLiteStatement;
 import haxe.ds.Vector;
@@ -26,7 +27,7 @@ import haxe.ds.Vector;
  */
 @:unreflective
 @:allow(sqlite.SQLiteDatabase)
-class SQLiteStatement extends Finalizable {
+class SQLiteStatement {
 	/**
 	 * The database connection associated with this statement.
 	 */
@@ -49,21 +50,22 @@ class SQLiteStatement extends Finalizable {
 	private var execution:Int = 0;
 
 	private function new(owner:SQLiteDatabase, statement:Pointer<RawSQLiteStatement>) {
-		super();
 		this.owner = owner;
 		this.statement = statement;
+		// Set a function to call when garbage collecting this object.
+		Gc.setFinalizer(this, Callable.fromStaticFunction(onCollected));
 	}
 
 	/**
 	 * Guarantee the extern statement gets finalized and cleaned up
 	 * when garbage collecting this object.
 	 */
-	public override function finalize() {
-		if (statement != null) {
-			sqlite3_finalize(statement.raw);
-			statement = null;
+	@:void
+	private static function onCollected(stmt:SQLiteStatement):Void {
+		if (stmt.statement != null) {
+			sqlite3_finalize(stmt.statement.raw);
+			stmt.statement = null;
 		}
-		super.finalize();
 	}
 
 	/**
