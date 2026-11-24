@@ -26,7 +26,7 @@ class TestPreparedInsert extends Test {
 		stmt.bindInt(3, 1);
 		stmt.executeQuery();
 
-		var lastInsertedId = db.lastInsertRowId();
+		var lastInsertedId = haxe.Int64.toInt(db.lastInsertRowId());
 		Assert.equals(5, lastInsertedId);
 
 		var stmt = db.prepare("SELECT * FROM Person WHERE personId = " + lastInsertedId);

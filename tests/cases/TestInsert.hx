@@ -23,7 +23,7 @@ class TestInsert extends Test {
 		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId) VALUES ('new last name', 'new first name', 1)");
 		stmt.executeQuery();
 
-		var lastInsertedId = db.lastInsertRowId();
+		var lastInsertedId = haxe.Int64.toInt(db.lastInsertRowId());
 		Assert.equals(5, lastInsertedId);
 
 		var stmt = db.prepare("SELECT * FROM Person WHERE personId = " + lastInsertedId);

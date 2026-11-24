@@ -41,7 +41,7 @@ class TestBlob extends Test {
 		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId, contractDocument) VALUES ('new last name', 'new first name', 1, X'746869732069732061206e657720636f6e747261637420646f63756d656e74')");
 		stmt.executeQuery();
 
-		var lastInsertedId = db.lastInsertRowId();
+		var lastInsertedId = haxe.Int64.toInt(db.lastInsertRowId());
 		Assert.equals(5, lastInsertedId);
 
 		var stmt = db.prepare("SELECT * FROM Person WHERE personId = " + lastInsertedId);

@@ -1,15 +1,15 @@
 {
-    "version": "0.0.0",
+    "version": "0.1.0",
     "contributors": [
         "haxeui",
         "ianharrigan"
     ],
     "license": "MIT",
-    "tags": [],
-    "releasenote": "0.0.0",
+    "tags": ["database"],
+    "releasenote": "Development release.",
     "dependencies": {},
     "classPath": "src",
     "name": "libsqlite3",
-    "description": "",
+    "description": "HXCPP bindings for SQLite3.",
     "url": "https://github.com/EliteMasterEric/libsqlite3"
 }

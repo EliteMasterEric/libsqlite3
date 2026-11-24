@@ -5,6 +5,7 @@ import cpp.ConstCharStar;
 import cpp.Pointer;
 import cpp.RawPointer;
 import haxe.Exception;
+import haxe.Int64;
 import sqlite._internal.RawSQLite;
 import sqlite._internal.RawSQLite.*;
 import sqlite._internal.RawSQLiteStatement;
@@ -52,6 +53,8 @@ class SQLiteDatabase {
 	}
 
 	public function prepare(sql:String):SQLiteStatement {
+		if (db == null) throw "Database is closed";
+
 		var rawStatement:RawPointer<RawSQLiteStatement> = null;
 		var rawTail:ConstCharStar = null;
 
@@ -77,12 +80,15 @@ class SQLiteDatabase {
 		statements.remove(stmt);
 	}
 
-	public function lastInsertRowId():Int {
+	public function lastInsertRowId():Int64 {
+		if (db == null) throw "Database is closed";
 		return sqlite3_last_insert_rowid(db.raw);
 	}
 
-	public function changes():Int {
-		return sqlite3_changes(db.raw);
+	public function changes():Int64 {
+		if (db == null) throw "Database is closed";
+		
+		return sqlite3_changes64(db.raw);
 	}
 }
 #end

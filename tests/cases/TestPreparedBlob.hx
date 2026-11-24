@@ -28,7 +28,7 @@ class TestPreparedBlob extends Test {
 		stmt.bindBytes(4, Bytes.ofString("this is a new contract document"));
 		stmt.executeQuery();
 
-		var lastInsertedId = db.lastInsertRowId();
+		var lastInsertedId = haxe.Int64.toInt(db.lastInsertRowId());
 		Assert.equals(5, lastInsertedId);
 
 		var stmt = db.prepare("SELECT * FROM Person WHERE personId = " + lastInsertedId);

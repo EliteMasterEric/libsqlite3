@@ -4,6 +4,7 @@ import utest.ui.common.HeaderDisplayMode;
 import utest.ui.Report;
 import utest.Runner;
 import cases.*;
+import regression.*;
 
 class TestAll {
 	public static function main() {
@@ -17,6 +18,9 @@ class TestAll {
 		runner.addCase(new TestPreparedInnerJoin());
 		runner.addCase(new TestBlob());
 		runner.addCase(new TestPreparedBlob());
+
+		runner.addCase(new TestUseAfterClose());
+		runner.addCase(new TestNoTruncation());
 
 		Report.create(runner, SuccessResultsDisplayMode.AlwaysShowSuccessResults, HeaderDisplayMode.NeverShowHeader);
 		runner.run();

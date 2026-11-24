@@ -1,12 +1,15 @@
 package sqlite;
 
+import cpp.Char;
 import cpp.ConstPointer;
+import cpp.NativeString;
 import cpp.UInt8;
 import cpp.RawConstPointer;
 import cpp.NativeArray;
 import haxe.io.BytesData;
 import haxe.io.Bytes;
 import haxe.Exception;
+import haxe.Int64;
 import cpp.Pointer;
 import cpp.Finalizable;
 import sqlite._internal.RawSQLite.*;
@@ -62,34 +65,67 @@ class SQLiteStatement extends Finalizable {
 		this.statement = null;
 	}
 
+	// Throws instead of passing a null handle to SQLite after `close()`.
+	private function assertOpen():Void {
+		
+	}
+
 	public function reset():SQLiteStatement {
+		if (statement == null) throw "Statement is closed";
+		
 		sqlite3_reset(statement.raw);
 		return this;
 	}
 
 	public function bindInt(index:Int, value:Int):SQLiteStatement {
-		untyped __cpp__("sqlite3_bind_int({0}, {1}, {2})", statement, index, value);
+		if (statement == null) throw "Statement is closed";
+
+		sqlite3_bind_int(statement.raw, index, value);
+		return this;
+	}
+
+	public function bindInt64(index:Int, value:Int64):SQLiteStatement {
+		if (statement == null) throw "Statement is closed";
+
+		sqlite3_bind_int64(statement.raw, index, value);
 		return this;
 	}
 
 	public function bindFloat(index:Int, value:Float):SQLiteStatement {
-		untyped __cpp__("sqlite3_bind_double({0}, {1}, {2})", statement, index, value);
+		if (statement == null) throw "Statement is closed";
+
+		sqlite3_bind_double(statement.raw, index, value);
 		return this;
 	}
 
 	public function bindString(index:Int, value:String):SQLiteStatement {
-		untyped __cpp__("sqlite3_bind_text({0}, {1}, {2}, -1, SQLITE_TRANSIENT)", statement, index, value);
+		if (statement == null) throw "Statement is closed";
+
+		// Bind the full UTF-8 encoding with its length, so text containing NUL characters is not cut short.
+		// (The implicit `ConstCharStar` conversion stops at the first NUL for non-ASCII strings.)
+		var utf8 = Bytes.ofString(value);
+		if (utf8.length == 0) {
+			// A NULL pointer would bind SQL NULL, so pass a literal for the empty string.
+			sqlite3_bind_text(statement.raw, index, "", 0, SQLITE_TRANSIENT);
+		} else {
+			var p:Pointer<Char> = NativeArray.address(utf8.getData(), 0).reinterpret();
+			sqlite3_bind_text(statement.raw, index, cast p.raw, utf8.length, SQLITE_TRANSIENT);
+		}
 		return this;
 	}
 
 	public function bindBytes(index:Int, value:Bytes):SQLiteStatement {
+		if (statement == null) throw "Statement is closed";
+
 		var len = value.length;
-		var p = NativeArray.address(value.getData(), 0);
-		untyped __cpp__("sqlite3_bind_blob({0}, {1}, {2}, {3}, SQLITE_TRANSIENT)", statement, index, p, len);
+		var p:Pointer<cpp.Void> = NativeArray.address(value.getData(), 0).reinterpret();
+		sqlite3_bind_blob(statement.raw, index, p.raw, len, SQLITE_TRANSIENT);
 		return this;
 	}
 
 	public function executeStatement() {
+		if (statement == null) throw "Statement is closed";
+
 		var i = sqlite3_step(statement.raw);
 		if (i != SQLite.DONE) {
 			throw new Exception(sqlite3_errmsg(owner.db.raw));
@@ -97,6 +133,8 @@ class SQLiteStatement extends Finalizable {
 	}
 
 	public function executeQuery():Iterator<Dynamic> {
+		if (statement == null) throw "Statement is closed";
+
 		var columnCount = sqlite3_column_count(statement.raw);
 		var columnNames = new Vector<String>(columnCount);
 		for (i in 0...columnCount) {
@@ -108,6 +146,8 @@ class SQLiteStatement extends Finalizable {
 		return {
 			hasNext: () -> status == SQLite.ROW,
 			next: () -> {
+				if (statement == null) throw "Statement is closed";
+
 				switch (status) {
 					case SQLite.DONE:
 						return null;
@@ -117,12 +157,20 @@ class SQLiteStatement extends Finalizable {
 							var type = sqlite3_column_type(statement.raw, i);
 							switch (type) {
 								case SQLite.INTEGER:
-									Reflect.setField(data, columnNames[i], sqlite3_column_int(statement.raw, i));
+									// An `Int` when the value fits in 32 bits, otherwise an `Int64`.
+									var value:Int64 = sqlite3_column_int64(statement.raw, i);
+									if (value.high == value.low >> 31) {
+										Reflect.setField(data, columnNames[i], value.low);
+									} else {
+										Reflect.setField(data, columnNames[i], value);
+									}
 								case SQLite.FLOAT:
 									Reflect.setField(data, columnNames[i], sqlite3_column_double(statement.raw, i));
 								case SQLite.TEXT:
-									var s:String = untyped __cpp__("(const char*)sqlite3_column_text({0}, {1})", statement.raw, i);
-									Reflect.setField(data, columnNames[i], s);
+									// Read the byte count after the text, as SQLite recommends, so embedded NULs are kept.
+									var text:ConstPointer<Char> = ConstPointer.fromRaw(sqlite3_column_text(statement.raw, i)).reinterpret();
+									var textBytes:Int = sqlite3_column_bytes(statement.raw, i);
+									Reflect.setField(data, columnNames[i], NativeString.fromPointerLen(text, textBytes));
 								case SQLite.BLOB:
 									var rawData:RawConstPointer<cpp.Void> = sqlite3_column_blob(statement.raw, i);
 									var p:ConstPointer<cpp.Void> = ConstPointer.fromRaw(rawData);
