@@ -2,7 +2,7 @@ package cases;
 
 import haxe.io.Bytes;
 import cases.util.RecordUtils;
-import sqlite.Sqlite;
+import sqlite.SQLite;
 import utest.Assert;
 import utest.Test;
 import cases.util.DBCreator;
@@ -19,7 +19,7 @@ class TestPreparedBlob extends Test {
 	}
 
 	function testBasicBlobPreparedInsert(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 
 		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId, contractDocument) VALUES (?, ?, ?, X'746869732069732061206e657720636f6e747261637420646f63756d656e74')");
 		stmt.bindString(1, "new last name");

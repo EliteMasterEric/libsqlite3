@@ -1,7 +1,7 @@
 package cases;
 
 import cases.util.RecordUtils;
-import sqlite.Sqlite;
+import sqlite.SQLite;
 import utest.Assert;
 import cases.util.DBCreator;
 import utest.Async;
@@ -18,7 +18,7 @@ class TestInnerJoin extends Test {
 	}
 
 	function testBasicInnerJoin(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
         ");
@@ -43,7 +43,7 @@ class TestInnerJoin extends Test {
 	}
 
 	function testBasicInnerJoinWhere(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
         WHERE personId = 1");
@@ -62,7 +62,7 @@ class TestInnerJoin extends Test {
 	}
 
 	function testBasicInnerJoinWhereOr(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
         WHERE personId = 1 OR personId = 4");
@@ -87,7 +87,7 @@ class TestInnerJoin extends Test {
 	}
 
 	function testBasicInnerJoinWhereAnd(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
         WHERE personId = 1 AND firstName = 'Ian'");

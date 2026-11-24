@@ -1,7 +1,7 @@
 package cases;
 
 import cases.util.RecordUtils;
-import sqlite.Sqlite;
+import sqlite.SQLite;
 import utest.Assert;
 import cases.util.DBCreator;
 import utest.Async;
@@ -18,7 +18,7 @@ class TestQuery extends Test {
 	}
 
 	function testBasicSelect(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person");
 		var rs = RecordUtils.toArray(stmt.executeQuery());
 
@@ -39,7 +39,7 @@ class TestQuery extends Test {
 	}
 
 	function testBasicSelectWhere(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person WHERE personId = 1");
 		var rs = RecordUtils.toArray(stmt.executeQuery());
 
@@ -55,7 +55,7 @@ class TestQuery extends Test {
 	}
 
 	function testBasicSelectWhereOr(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person WHERE personId = 1 OR personId = 4");
 		var rs = RecordUtils.toArray(stmt.executeQuery());
 
@@ -76,7 +76,7 @@ class TestQuery extends Test {
 	}
 
 	function testBasicSelectWhereAnd(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person WHERE personId = 1 AND firstName = 'Ian'");
 		var rs = RecordUtils.toArray(stmt.executeQuery());
 

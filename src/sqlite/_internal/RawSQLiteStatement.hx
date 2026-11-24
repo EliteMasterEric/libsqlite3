@@ -6,4 +6,4 @@ package sqlite._internal;
 @:include("sqlite3.h")
 @:native("sqlite3_stmt")
 @:unreflective
-extern class RawSqliteStatement {}
+extern class RawSQLiteStatement {}

@@ -2,7 +2,7 @@ package cases;
 
 import haxe.io.Bytes;
 import cases.util.RecordUtils;
-import sqlite.Sqlite;
+import sqlite.SQLite;
 import utest.Assert;
 import utest.Test;
 import cases.util.DBCreator;
@@ -19,7 +19,7 @@ class TestBlob extends Test {
 	}
 
 	function testBasicBlob(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 		var stmt = db.prepare("SELECT * FROM Person WHERE personId = 1");
 		var rs = RecordUtils.toArray(stmt.executeQuery());
 
@@ -36,7 +36,7 @@ class TestBlob extends Test {
 	}
 
 	function testBasicBlobInsert(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 
 		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId, contractDocument) VALUES ('new last name', 'new first name', 1, X'746869732069732061206e657720636f6e747261637420646f63756d656e74')");
 		stmt.executeQuery();

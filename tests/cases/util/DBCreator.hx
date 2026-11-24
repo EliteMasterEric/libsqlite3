@@ -1,6 +1,6 @@
 package cases.util;
 
-import sqlite.Sqlite;
+import sqlite.SQLite;
 import sys.io.File;
 import sys.FileSystem;
 
@@ -15,7 +15,7 @@ class DBCreator {
 	}
 
 	static function createTables():Void {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 
 		// One transaction for all tables to make tests faster.
 		db.prepare("BEGIN;").executeStatement();
@@ -54,7 +54,7 @@ class DBCreator {
 	}
 
 	public static function addDummyData():Void {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 
 		// One transaction for all inserts to make tests faster.
 		db.prepare("BEGIN;").executeStatement();

@@ -4,16 +4,16 @@ package sqlite;
 import cpp.Pointer;
 import cpp.RawPointer;
 import haxe.Exception;
-import sqlite._internal.RawSqlite;
-import sqlite._internal.RawSqlite.*;
+import sqlite._internal.RawSQLite;
+import sqlite._internal.RawSQLite.*;
 
 /**
- * Call `Sqlite.open(path)` to get an SQLite Database object to perform queries on.
+ * Call `SQLite.open(path)` to get an SQLite Database object to perform queries on.
  * 
  * @see https://github.com/davidgiven/stellation/blob/stellation7/src/runtime/cpp/Sqlite.hx
  */
 @:unreflective
-class Sqlite {
+class SQLite {
 	public static final DONE:Int = untyped __cpp__("SQLITE_DONE");
 	public static final ROW:Int = untyped __cpp__("SQLITE_ROW");
 	public static final OK:Int = untyped __cpp__("SQLITE_OK");
@@ -24,13 +24,13 @@ class Sqlite {
 	public static final NULL:Int = untyped __cpp__("SQLITE_NULL");
 	public static final TEXT:Int = untyped __cpp__("SQLITE_TEXT");
 
-	public static function open(path:String):SqliteDatabase {
-		var db:RawPointer<RawSqlite> = null;
+	public static function open(path:String):SQLiteDatabase {
+		var db:RawPointer<RawSQLite> = null;
 		var i = sqlite3_open(path, RawPointer.addressOf(db));
 		if (i != 0) {
 			throw new Exception(sqlite3_errmsg(db));
 		}
-		return new SqliteDatabase(Pointer.fromRaw(db));
+		return new SQLiteDatabase(Pointer.fromRaw(db));
 	}
 }
 #end

@@ -1,7 +1,7 @@
 package cases;
 
 import cases.util.RecordUtils;
-import sqlite.Sqlite;
+import sqlite.SQLite;
 import utest.Assert;
 import cases.util.DBCreator;
 import utest.Async;
@@ -18,7 +18,7 @@ class TestInsert extends Test {
 	}
 
 	function testBasicInsert(async:Async) {
-		var db = Sqlite.open("persons.db");
+		var db = SQLite.open("persons.db");
 
 		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId) VALUES ('new last name', 'new first name', 1)");
 		stmt.executeQuery();
