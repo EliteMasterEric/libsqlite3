@@ -18,11 +18,19 @@ class TestAll {
 		runner.addCase(new TestPreparedInnerJoin());
 		runner.addCase(new TestBlob());
 		runner.addCase(new TestPreparedBlob());
+		runner.addCase(new TestTypes());
+		runner.addCase(new TestStatementReuse());
+		runner.addCase(new TestErrors());
+		runner.addCase(new TestConnection());
 
 		runner.addCase(new TestUseAfterClose());
 		runner.addCase(new TestNoTruncation());
 		runner.addCase(new TestReturnCodes());
 		runner.addCase(new TestPrepareTrailingText());
+		runner.addCase(new TestFailedOpen());
+		runner.addCase(new TestBindBytes());
+		runner.addCase(new TestQueryErrors());
+		runner.addCase(new TestUnclosedDatabase());
 
 		Report.create(runner, SuccessResultsDisplayMode.AlwaysShowSuccessResults, HeaderDisplayMode.NeverShowHeader);
 		runner.run();
