@@ -2,6 +2,7 @@ package sqlite;
 
 #if cpp
 import cpp.ConstCharStar;
+import cpp.Finalizable;
 import cpp.Pointer;
 import cpp.RawPointer;
 import haxe.Exception;
@@ -17,7 +18,7 @@ import sqlite._internal.RawSQLiteStatement;
  */
 @:unreflective
 @:allow(sqlite.SQLiteStatement)
-class SQLiteDatabase {
+class SQLiteDatabase extends Finalizable {
 	/**
 	 * The C extern to interact with the SQLite database.
 	 */
@@ -29,7 +30,19 @@ class SQLiteDatabase {
 	private var statements:Array<SQLiteStatement> = [];
 
 	public function new(db:Pointer<RawSQLite>) {
+		super();
 		this.db = db;
+	}
+
+	/**
+	 * Ensure garbage collection closes the connection.
+	 */
+	public override function finalize() {
+		if (db != null) {
+			sqlite3_close_v2(db.raw);
+			db = null;
+		}
+		super.finalize();
 	}
 
 	/**
@@ -43,8 +56,8 @@ class SQLiteDatabase {
 			statement.close();
 		}
 
-		var result = sqlite3_close(db.raw);
-		if (result != SQLite.OK) {
+		var result:SQLiteResultCode = sqlite3_close_v2(db.raw);
+		if (result != SQLiteResultCode.OK) {
 			// Throw an error if SQLite can't close the connection.
 			throw new Exception(sqlite3_errmsg(db.raw));
 		}
@@ -58,20 +71,34 @@ class SQLiteDatabase {
 		var rawStatement:RawPointer<RawSQLiteStatement> = null;
 		var rawTail:ConstCharStar = null;
 
-		var i = sqlite3_prepare_v2(db.raw, sql, -1, RawPointer.addressOf(rawStatement), RawPointer.addressOf(rawTail));
-		if (i != 0) {
+		var result:SQLiteResultCode = sqlite3_prepare_v2(db.raw, sql, -1, RawPointer.addressOf(rawStatement), RawPointer.addressOf(rawTail));
+		if (result != SQLiteResultCode.OK) {
 			throw new Exception(sqlite3_errmsg(db.raw));
+		}
+
+		// SQLite returns `null` if the resulting statement was empty (or only had comments)
+		if (rawStatement == null) {
+			throw new Exception("No SQL statement to prepare");
+		}
+
+		// Ensure an error is thrown if some of the statement is left trailing.
+		var restStatement:RawPointer<RawSQLiteStatement> = null;
+		var restTail:ConstCharStar = rawTail;
+		while (true) {
+			var rest:ConstCharStar = restTail;
+			result = sqlite3_prepare_v2(db.raw, rest, -1, RawPointer.addressOf(restStatement), RawPointer.addressOf(restTail));
+			if (result != SQLiteResultCode.OK || restStatement != null) {
+				var message:String = result != SQLiteResultCode.OK ? sqlite3_errmsg(db.raw) : 'Only one statement can be prepared at a time, but found more: "${(rest : String)}"';
+				sqlite3_finalize(restStatement);
+				sqlite3_finalize(rawStatement);
+				throw new Exception(message);
+			}
+			// Stop once SQLite consumes nothing more.
+			if (restTail == rest) break;
 		}
 
 		var stmt = new SQLiteStatement(this, Pointer.fromRaw(rawStatement));
 		statements.push(stmt);
-
-		var tail:String = rawTail;
-		if (tail != "") {
-			stmt.close();
-			throw new Exception('Some of statement ignored: "${tail}"');
-		}
-
 		return stmt;
 	}
 

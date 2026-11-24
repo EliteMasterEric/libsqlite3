@@ -47,6 +47,7 @@ extern class RawSQLite {
 	@:native("sqlite3_libversion") static function sqlite3_libversion():ConstCharStar;
 	@:native("sqlite3_libversion_number") static function sqlite3_libversion_number():Int;
 	@:native("sqlite3_free") static function sqlite3_free(ptr:RawPointer<cpp.Void>):Void;
+	@:native("sqlite3_memory_used") static function sqlite3_memory_used():Int64;
 
 	// Connections
 	@:native("sqlite3_open") static function sqlite3_open(filename:ConstCharStar, db:RawPointer<RawPointer<RawSQLite>>):Int;

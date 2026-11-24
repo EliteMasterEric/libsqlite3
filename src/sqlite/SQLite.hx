@@ -14,21 +14,15 @@ import sqlite._internal.RawSQLite.*;
  */
 @:unreflective
 class SQLite {
-	public static final DONE:Int = untyped __cpp__("SQLITE_DONE");
-	public static final ROW:Int = untyped __cpp__("SQLITE_ROW");
-	public static final OK:Int = untyped __cpp__("SQLITE_OK");
-
-	public static final INTEGER:Int = untyped __cpp__("SQLITE_INTEGER");
-	public static final FLOAT:Int = untyped __cpp__("SQLITE_FLOAT");
-	public static final BLOB:Int = untyped __cpp__("SQLITE_BLOB");
-	public static final NULL:Int = untyped __cpp__("SQLITE_NULL");
-	public static final TEXT:Int = untyped __cpp__("SQLITE_TEXT");
-
 	public static function open(path:String):SQLiteDatabase {
 		var db:RawPointer<RawSQLite> = null;
-		var i = sqlite3_open(path, RawPointer.addressOf(db));
-		if (i != 0) {
-			throw new Exception(sqlite3_errmsg(db));
+		var result:SQLiteResultCode = sqlite3_open(path, RawPointer.addressOf(db));
+		if (result != SQLiteResultCode.OK) {
+			// SQLite allocates the handle even when opening fails, so it must still be closed.
+			// Copy the message first, since closing frees it.
+			var message:String = sqlite3_errmsg(db);
+			sqlite3_close_v2(db);
+			throw new Exception(message);
 		}
 		return new SQLiteDatabase(Pointer.fromRaw(db));
 	}

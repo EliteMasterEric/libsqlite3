@@ -4,8 +4,8 @@ package sqlite;
 import cpp.Char;
 import cpp.ConstPointer;
 import cpp.NativeString;
-import cpp.UInt8;
 import cpp.RawConstPointer;
+import cpp.Stdlib;
 import cpp.NativeArray;
 import haxe.io.Bytes;
 import haxe.Exception;
@@ -69,11 +69,11 @@ class SQLiteStatement extends Finalizable {
 	public function reset():SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		var result = sqlite3_reset(statement.raw);
+		var result:SQLiteResultCode = sqlite3_reset(statement.raw);
 		
 		var alreadyThrown = stepErrorThrown;
 		stepErrorThrown = false;
-		if (result != SQLite.OK && !alreadyThrown) {
+		if (result != SQLiteResultCode.OK && !alreadyThrown) {
 			throw new Exception(sqlite3_errmsg(owner.db.raw));
 		}
 
@@ -83,8 +83,8 @@ class SQLiteStatement extends Finalizable {
 	public function bindInt(index:Int, value:Int):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		var result = sqlite3_bind_int(statement.raw, index, value));
-		if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		var result:SQLiteResultCode = sqlite3_bind_int(statement.raw, index, value);
+		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 
 		return this;
 	}
@@ -92,8 +92,8 @@ class SQLiteStatement extends Finalizable {
 	public function bindInt64(index:Int, value:Int64):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		var result = sqlite3_bind_int64(statement.raw, index, value));
-		if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		var result:SQLiteResultCode = sqlite3_bind_int64(statement.raw, index, value);
+		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 
 		return this;
 	}
@@ -101,8 +101,8 @@ class SQLiteStatement extends Finalizable {
 	public function bindFloat(index:Int, value:Float):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		var result = sqlite3_bind_double(statement.raw, index, value));
-		if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		var result:SQLiteResultCode = sqlite3_bind_double(statement.raw, index, value);
+		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 
 		return this;
 	}
@@ -114,13 +114,13 @@ class SQLiteStatement extends Finalizable {
 		// (The implicit `ConstCharStar` conversion stops at the first NUL for non-ASCII strings.)
 		var utf8 = Bytes.ofString(value);
 		if (utf8.length == 0) {
-			// A NULL pointer would bind SQL NULL, so pass a literal for the empty string.
-			var result = sqlite3_bind_text(statement.raw, index, "", 0, SQLITE_TRANSIENT);
-			if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+			// Bind a literal rather than taking the address of an empty buffer (see `bindBytes`).
+			var result:SQLiteResultCode = sqlite3_bind_text(statement.raw, index, "", 0, SQLITE_TRANSIENT);
+			if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 		} else {
 			var p:Pointer<Char> = NativeArray.address(utf8.getData(), 0).reinterpret();
-			var result = sqlite3_bind_text(statement.raw, index, cast p.raw, utf8.length, SQLITE_TRANSIENT);
-			if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+			var result:SQLiteResultCode = sqlite3_bind_text(statement.raw, index, cast p.raw, utf8.length, SQLITE_TRANSIENT);
+			if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 		}
 		return this;
 	}
@@ -128,21 +128,33 @@ class SQLiteStatement extends Finalizable {
 	public function bindBytes(index:Int, value:Bytes):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		var len = value.length;
-		var p:Pointer<cpp.Void> = NativeArray.address(value.getData(), 0).reinterpret();
-		var result = sqlite3_bind_blob(statement.raw, index, p.raw, len, SQLITE_TRANSIENT);
-		if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		var result:SQLiteResultCode;
+		if (value.length == 0) {
+			// Bind a zero blob instead of using NativeArray to prevent the array from auto-growing.
+			result = sqlite3_bind_zeroblob(statement.raw, index, 0);
+		} else {
+			var p:Pointer<cpp.Void> = NativeArray.address(value.getData(), 0).reinterpret();
+			result = sqlite3_bind_blob(statement.raw, index, p.raw, value.length, SQLITE_TRANSIENT);
+		}
+		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 		return this;
 	}
 
 	public function executeStatement() {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		var result = sqlite3_step(statement.raw);
-		if (result != SQLite.DONE) {
-			stepErrorThrown = true;
-			throw new Exception(sqlite3_errmsg(owner.db.raw));
-		}
+		var result:SQLiteResultCode = sqlite3_step(statement.raw);
+		if (result != SQLiteResultCode.DONE) throwStepError(sqlite3_errmsg(owner.db.raw));
+	}
+
+
+	/**
+	 * Throw an error resulting from a call to `sqlite3_step()`,
+	 * then remember we did that so `sqlite3_reset()` doesn't rethrow the same error.
+	 */
+	private function throwStepError(message:String):Void {
+		stepErrorThrown = true;
+		throw new Exception(message);
 	}
 
 	public function executeQuery():Iterator<Dynamic> {
@@ -154,22 +166,31 @@ class SQLiteStatement extends Finalizable {
 			columnNames[i] = sqlite3_column_name(statement.raw, i);
 		}
 
-		var status = sqlite3_step(statement.raw);
+		var status:SQLiteResultCode = sqlite3_step(statement.raw);
+		if (status != SQLiteResultCode.ROW && status != SQLiteResultCode.DONE) throwStepError(sqlite3_errmsg(owner.db.raw));
+
+		// An error fetching the next row is kept and thrown by the next `hasNext()` or `next()` call,
+		// so the row already fetched is still returned.
+		var nextRowError:Null<String> = null;
 
 		return {
-			hasNext: () -> status == SQLite.ROW,
+			hasNext: () -> {
+				if (nextRowError != null) throwStepError(nextRowError);
+				return status == SQLiteResultCode.ROW;
+			},
 			next: () -> {
 				if (statement == null) throw new Exception("Statement is closed");
+				if (nextRowError != null) throwStepError(nextRowError);
 
 				switch (status) {
-					case SQLite.DONE:
+					case DONE:
 						return null;
-					case SQLite.ROW:
+					case ROW:
 						var data = {};
 						for (i in 0...columnCount) {
-							var type = sqlite3_column_type(statement.raw, i);
+							var type:SQLiteColumnType = sqlite3_column_type(statement.raw, i);
 							switch (type) {
-								case SQLite.INTEGER:
+								case INTEGER:
 									// An `Int` when the value fits in 32 bits, otherwise an `Int64`.
 									var value:Int64 = sqlite3_column_int64(statement.raw, i);
 									if (value.high == value.low >> 31) {
@@ -177,33 +198,38 @@ class SQLiteStatement extends Finalizable {
 									} else {
 										Reflect.setField(data, columnNames[i], value);
 									}
-								case SQLite.FLOAT:
+								case FLOAT:
 									Reflect.setField(data, columnNames[i], sqlite3_column_double(statement.raw, i));
-								case SQLite.TEXT:
+								case TEXT:
 									// Read the byte count after the text, as SQLite recommends, so embedded NULs are kept.
 									var text:ConstPointer<Char> = ConstPointer.fromRaw(sqlite3_column_text(statement.raw, i)).reinterpret();
 									var textBytes:Int = sqlite3_column_bytes(statement.raw, i);
 									Reflect.setField(data, columnNames[i], NativeString.fromPointerLen(text, textBytes));
-								case SQLite.BLOB:
-									var rawData:RawConstPointer<cpp.Void> = sqlite3_column_blob(statement.raw, i);
-									var p:ConstPointer<cpp.Void> = ConstPointer.fromRaw(rawData);
+								case BLOB:
+									// Copy into GC-owned Bytes: SQLite frees its buffer at the next step.
+									// Read the byte count after the blob, as SQLite recommends.
+									var blob:RawConstPointer<cpp.Void> = sqlite3_column_blob(statement.raw, i);
 									var size:Int = sqlite3_column_bytes(statement.raw, i);
-									var bytesData:Array<UInt8> = NativeArray.create(size);
-									NativeArray.setData(bytesData, p.reinterpret(), size);
-									var bytes:Bytes = Bytes.ofData(bytesData);
-									var bytesCopy:Bytes = Bytes.alloc(size); // need to maybe a copy, gc'd or freed maybe?
-									bytesCopy.blit(0, bytes, 0, size);
-									Reflect.setField(data, columnNames[i], bytesCopy);
-								case SQLite.NULL:
+									var bytes = Bytes.alloc(size);
+									if (size > 0) {
+										var dest:Pointer<cpp.Void> = NativeArray.address(bytes.getData(), 0).reinterpret();
+										Stdlib.nativeMemcpy(dest.raw, blob, size);
+									}
+									Reflect.setField(data, columnNames[i], bytes);
+								case NULL:
 									Reflect.setField(data, columnNames[i], null);
 								case _:
-									throw new Exception('Type error ${type}');
+									throw new Exception('Unknown column type ${type}');
 							}
 						}
 						status = sqlite3_step(statement.raw);
+						if (status != SQLiteResultCode.ROW && status != SQLiteResultCode.DONE) {
+							nextRowError = sqlite3_errmsg(owner.db.raw);
+						}
 						return data;
 					case _:
-						throw new Exception('Cursor error ${status}');
+						// Unreachable: errors are thrown above, before the status is read.
+						throw new Exception('Unexpected step result ${status}');
 				}
 			}
 		}
