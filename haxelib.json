@@ -5,11 +5,9 @@
         "ianharrigan"
     ],
     "license": "MIT",
-    "tags": [
-    ],
+    "tags": [],
     "releasenote": "0.0.0",
-    "dependencies": {
-    },
+    "dependencies": {},
     "classPath": "src",
     "name": "libsqlite3",
     "description": "",

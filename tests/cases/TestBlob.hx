@@ -8,61 +8,61 @@ import utest.Test;
 import cases.util.DBCreator;
 import utest.Async;
 
-class TestBlob extends Test {    
-    function setupClass(async:Async) {
-        logging.LogManager.instance.addAdaptor(new logging.adaptors.ConsoleLogAdaptor({
-            levels: [logging.LogLevel.Info, logging.LogLevel.Error]
-        }));
-        DBCreator.create().then(_ -> {
-            async.done();
-        });
-    }
+class TestBlob extends Test {
+	function setupClass(async:Async) {
+		logging.LogManager.instance.addAdaptor(new logging.adaptors.ConsoleLogAdaptor({
+			levels: [logging.LogLevel.Info, logging.LogLevel.Error]
+		}));
+		DBCreator.create().then(_ -> {
+			async.done();
+		});
+	}
 
-    function teardownClass(async:Async) {
-        logging.LogManager.instance.clearAdaptors();
-        DBCreator.delete();
-        async.done();
-    }
+	function teardownClass(async:Async) {
+		logging.LogManager.instance.clearAdaptors();
+		DBCreator.delete();
+		async.done();
+	}
 
-    function testBasicBlob(async:Async) {
-        var db = Sqlite.open("persons.db");
-        var stmt = db.prepare("SELECT * FROM Person WHERE personId = 1");
-        var rs = RecordUtils.toArray(stmt.executeQuery());
+	function testBasicBlob(async:Async) {
+		var db = Sqlite.open("persons.db");
+		var stmt = db.prepare("SELECT * FROM Person WHERE personId = 1");
+		var rs = RecordUtils.toArray(stmt.executeQuery());
 
-        Assert.equals(1, rs.length);
+		Assert.equals(1, rs.length);
 
-        Assert.equals(rs[0].personId, 1);
-        Assert.equals(rs[0].firstName, "Ian");
-        Assert.equals(rs[0].lastName, "Harrigan");
-        Assert.equals(rs[0].iconId, 1);
-        Assert.isOfType(rs[0].contractDocument, Bytes);
-        Assert.equals(Bytes.ofString("this is ians contract document").toString(), rs[0].contractDocument.toString());
-        
-        async.done();
-    }
+		Assert.equals(rs[0].personId, 1);
+		Assert.equals(rs[0].firstName, "Ian");
+		Assert.equals(rs[0].lastName, "Harrigan");
+		Assert.equals(rs[0].iconId, 1);
+		Assert.isOfType(rs[0].contractDocument, Bytes);
+		Assert.equals(Bytes.ofString("this is ians contract document").toString(), rs[0].contractDocument.toString());
 
-    function testBasicBlobInsert(async:Async) {
-        var db = Sqlite.open("persons.db");
+		async.done();
+	}
 
-        var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId, contractDocument) VALUES ('new last name', 'new first name', 1, X'746869732069732061206e657720636f6e747261637420646f63756d656e74')");
-        stmt.executeQuery();
+	function testBasicBlobInsert(async:Async) {
+		var db = Sqlite.open("persons.db");
 
-        var lastInsertedId = db.lastInsertRowId();
-        Assert.equals(5, lastInsertedId);
+		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId, contractDocument) VALUES ('new last name', 'new first name', 1, X'746869732069732061206e657720636f6e747261637420646f63756d656e74')");
+		stmt.executeQuery();
 
-        var stmt = db.prepare("SELECT * FROM Person WHERE personId = " + lastInsertedId);
-        var rs = RecordUtils.toArray(stmt.executeQuery());
+		var lastInsertedId = db.lastInsertRowId();
+		Assert.equals(5, lastInsertedId);
 
-        Assert.equals(1, rs.length);
+		var stmt = db.prepare("SELECT * FROM Person WHERE personId = " + lastInsertedId);
+		var rs = RecordUtils.toArray(stmt.executeQuery());
 
-        Assert.equals(rs[0].personId, 5);
-        Assert.equals(rs[0].firstName, "new first name");
-        Assert.equals(rs[0].lastName, "new last name");
-        Assert.equals(rs[0].iconId, 1);
-        Assert.isOfType(rs[0].contractDocument, Bytes);
-        Assert.equals(Bytes.ofString("this is a new contract document").toString(), rs[0].contractDocument.toString());
-        
-        db.close();
-        async.done();
-    }
+		Assert.equals(1, rs.length);
+
+		Assert.equals(rs[0].personId, 5);
+		Assert.equals(rs[0].firstName, "new first name");
+		Assert.equals(rs[0].lastName, "new last name");
+		Assert.equals(rs[0].iconId, 1);
+		Assert.isOfType(rs[0].contractDocument, Bytes);
+		Assert.equals(Bytes.ofString("this is a new contract document").toString(), rs[0].contractDocument.toString());
+
+		db.close();
+		async.done();
+	}
 }
