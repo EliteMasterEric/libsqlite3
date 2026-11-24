@@ -2,12 +2,15 @@ package sqlite;
 
 #if cpp
 import cpp.Callable;
+import cpp.Char;
 import cpp.ConstCharStar;
+import cpp.NativeArray;
 import cpp.Pointer;
 import cpp.RawPointer;
 import cpp.vm.Gc;
 import cpp.vm.WeakRef;
 import haxe.Int64;
+import haxe.io.Bytes;
 import sqlite._internal.RawSQLite;
 import sqlite._internal.RawSQLite.*;
 import sqlite._internal.RawSQLiteStatement;
@@ -87,10 +90,15 @@ class SQLiteDatabase {
 	public function prepare(sql:String):SQLiteStatement {
 		checkOpen();
 
-		var rawStatement:RawPointer<RawSQLiteStatement> = null;
-		var rawTail:ConstCharStar = null;
+		// Pass SQLite the raw bytes of the string to ensure strings containing NULL are handled correctly.
+		var utf8 = Bytes.ofString(sql);
+		var length = utf8.length;
+		if (length == 0) throw new SQLiteException("No SQL statement to prepare", SQLiteResultCode.MISUSE);
+		var start:Pointer<Char> = NativeArray.address(utf8.getData(), 0).reinterpret();
 
-		var result:SQLiteResultCode = sqlite3_prepare_v2(db.raw, sql, -1, RawPointer.addressOf(rawStatement), RawPointer.addressOf(rawTail));
+		var rawStatement:RawPointer<RawSQLiteStatement> = null;
+		var tail:ConstCharStar = null;
+		var result:SQLiteResultCode = sqlite3_prepare_v2(db.raw, cast start.raw, length, RawPointer.addressOf(rawStatement), RawPointer.addressOf(tail));
 		if (result != SQLiteResultCode.OK) {
 			throw SQLiteException.fromConnection(db.raw);
 		}
@@ -100,22 +108,28 @@ class SQLiteDatabase {
 			throw new SQLiteException("No SQL statement to prepare", SQLiteResultCode.MISUSE);
 		}
 
-		// Ensure an error is thrown if some of the statement is left trailing.
-		var restStatement:RawPointer<RawSQLiteStatement> = null;
-		var restTail:ConstCharStar = rawTail;
-		while (true) {
-			var rest:ConstCharStar = restTail;
-			result = sqlite3_prepare_v2(db.raw, rest, -1, RawPointer.addressOf(restStatement), RawPointer.addressOf(restTail));
+		// Reject anything after the statement other than whitespace, comments and semicolons.
+		var offset = tailOffset(start, tail, 0);
+		while (offset < length) {
+			var restStatement:RawPointer<RawSQLiteStatement> = null;
+			result = sqlite3_prepare_v2(db.raw, cast start.add(offset).raw, length - offset, RawPointer.addressOf(restStatement), RawPointer.addressOf(tail));
 			if (result != SQLiteResultCode.OK || restStatement != null) {
-				var message:String = 'Only one statement can be prepared at a time, but found more: "${(rest : String)}"';
 				// The rest can fail to compile on its own, for example when it uses a table the first statement creates.
-				if (result != SQLiteResultCode.OK) message += ' (${(sqlite3_errmsg(db.raw) : String)})';
+				var error:Null<String> = result != SQLiteResultCode.OK ? sqlite3_errmsg(db.raw) : null;
 				sqlite3_finalize(restStatement);
 				sqlite3_finalize(rawStatement);
+				var message = 'Only one statement can be prepared at a time, but found more: "${utf8.getString(offset, length - offset)}"';
+				if (error != null) message += ' ($error)';
 				throw new SQLiteException(message, SQLiteResultCode.MISUSE);
 			}
-			// Stop once SQLite consumes nothing more.
-			if (restTail == rest) break;
+
+			var nextOffset = tailOffset(start, tail, offset);
+			// SQLite stops reading at a NUL character, so it consumes nothing when the rest starts with one.
+			if (nextOffset == offset) {
+				sqlite3_finalize(rawStatement);
+				throw new SQLiteException("SQL must not contain a NUL character", SQLiteResultCode.MISUSE);
+			}
+			offset = nextOffset;
 		}
 
 		var stmt = new SQLiteStatement(this, Pointer.fromRaw(rawStatement));
@@ -128,6 +142,18 @@ class SQLiteDatabase {
 
 		statements.push(new WeakRef(stmt));
 		return stmt;
+	}
+
+	/**
+	 * @return How many bytes `tail` is past `start`.
+	 * We know the value is at least `fromOffset`.
+	 */
+	private static function tailOffset(start:Pointer<Char>, tail:ConstCharStar, fromOffset:Int):Int {
+		var offset = fromOffset;
+		while ((cast start.add(offset).raw : ConstCharStar) != tail) {
+			offset++;
+		}
+		return offset;
 	}
 
 	// Called by `SQLiteStatement.close()` once the statement is finalized.
