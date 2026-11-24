@@ -32,6 +32,11 @@ class TestAll {
 		runner.addCase(new TestQueryErrors());
 		runner.addCase(new TestUnclosedDatabase());
 		runner.addCase(new TestNullBind());
+		runner.addCase(new TestExecuteStatementRows());
+		runner.addCase(new TestExecuteWithoutReset());
+		runner.addCase(new TestStaleIterator());
+		runner.addCase(new TestSchemaChange());
+		runner.addCase(new TestStepErrorFlag());
 
 		Report.create(runner, SuccessResultsDisplayMode.AlwaysShowSuccessResults, HeaderDisplayMode.NeverShowHeader);
 		runner.run();

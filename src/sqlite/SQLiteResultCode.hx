@@ -1,7 +1,7 @@
 package sqlite;
 
 /**
- * SQLite's primary result codes, as returned by most `sqlite3_*` functions.
+ * SQLite's primary result codes. `sqlite3_*` functions return these.
  *
  * @see https://www.sqlite.org/rescode.html
  */

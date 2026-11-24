@@ -33,6 +33,21 @@ class TestPrepareTrailingText extends Test {
 		db.close();
 	}
 
+	// A second statement that can't be compiled on its own (here, because it needs the first one to run)
+	// must still be reported as a second statement, not only with SQLite's compile error.
+	function testUncompilableSecondStatementReported() {
+		var db = SQLite.open(":memory:");
+		for (sql in ["CREATE TABLE a (x INTEGER); INSERT INTO a VALUES (1)", "SELECT 1; SELECT * FROM missing"]) {
+			try {
+				db.prepare(sql).close();
+				Assert.fail('prepare(${Json.stringify(sql)}) did not throw');
+			} catch (e:Exception) {
+				Assert.stringContains("Only one statement", e.message);
+			}
+		}
+		db.close();
+	}
+
 	function testNoStatementRejected() {
 		var db = SQLite.open(":memory:");
 		assertRejects(db, "");

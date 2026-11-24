@@ -88,7 +88,9 @@ class SQLiteDatabase extends Finalizable {
 			var rest:ConstCharStar = restTail;
 			result = sqlite3_prepare_v2(db.raw, rest, -1, RawPointer.addressOf(restStatement), RawPointer.addressOf(restTail));
 			if (result != SQLiteResultCode.OK || restStatement != null) {
-				var message:String = result != SQLiteResultCode.OK ? sqlite3_errmsg(db.raw) : 'Only one statement can be prepared at a time, but found more: "${(rest : String)}"';
+				var message:String = 'Only one statement can be prepared at a time, but found more: "${(rest : String)}"';
+				// The rest can fail to compile on its own, for example when it uses a table the first statement creates.
+				if (result != SQLiteResultCode.OK) message += ' (${(sqlite3_errmsg(db.raw) : String)})';
 				sqlite3_finalize(restStatement);
 				sqlite3_finalize(rawStatement);
 				throw new Exception(message);

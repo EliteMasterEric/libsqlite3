@@ -18,10 +18,12 @@ class SQLite {
 		var db:RawPointer<RawSQLite> = null;
 		var result:SQLiteResultCode = sqlite3_open(path, RawPointer.addressOf(db));
 		if (result != SQLiteResultCode.OK) {
-			// SQLite allocates the handle even when opening fails, so it must still be closed.
-			// Copy the message first, since closing frees it.
 			var message:String = sqlite3_errmsg(db);
+
+			// If SQLite fails to open the file, it still creates a handle.
+			// That must be closed to prevent a leak.
 			sqlite3_close_v2(db);
+
 			throw new Exception(message);
 		}
 		return new SQLiteDatabase(Pointer.fromRaw(db));

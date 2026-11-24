@@ -1,7 +1,7 @@
 package sqlite;
 
 /**
- * The storage class of a result column value, as returned by `sqlite3_column_type`.
+ * The storage class of a result column value. `sqlite3_column_type` returns these.
  */
 enum abstract SQLiteColumnType(Int) from Int to Int {
 	var INTEGER = 1;

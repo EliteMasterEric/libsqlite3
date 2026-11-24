@@ -18,8 +18,12 @@ import haxe.ds.Vector;
 
 /**
  * Represents a prepared SQL statement to be performed.
- * Bind values and execute the query rather than concatenating strings to avoid SQL injection attacks.
- * Returns an `Iterator<Dynamic>` when the statement is executed, use this to count and view the results.
+ * 
+ * NOTES:
+ * - Bind values and execute the query rather than concatenating strings to avoid SQL injection attacks.
+ * - 
+ * - Call `reset()` and you can bind new values and reuse the query object!
+ * @see https://www.sqlite.org/cintro.html
  */
 @:unreflective
 @:allow(sqlite.SQLiteDatabase)
@@ -39,12 +43,22 @@ class SQLiteStatement extends Finalizable {
 	 */
 	private var stepErrorThrown:Bool = false;
 
+	/**
+	 * Increments every time `reset()` gets thrown.
+	 * If an old `Iterator<Dynamic>` returned by `executeQuery()` is reused 
+	 */
+	private var execution:Int = 0;
+
 	private function new(owner:SQLiteDatabase, statement:Pointer<RawSQLiteStatement>) {
 		super();
 		this.owner = owner;
 		this.statement = statement;
 	}
 
+	/**
+	 * Guarantee the extern statement gets finalized and cleaned up
+	 * when garbage collecting this object.
+	 */
 	public override function finalize() {
 		if (statement != null) {
 			sqlite3_finalize(statement.raw);
@@ -66,9 +80,15 @@ class SQLiteStatement extends Finalizable {
 		this.statement = null;
 	}
 
+	/**
+	 * Resets the statement so it can be bound and executed again. Bound values are kept.
+	 * Iterators returned by earlier `executeQuery()` calls throw after this.
+	 * Throws a step error of the last execution that was not already thrown.
+	 */
 	public function reset():SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
+		execution++;
 		var result:SQLiteResultCode = sqlite3_reset(statement.raw);
 		
 		var alreadyThrown = stepErrorThrown;
@@ -80,6 +100,11 @@ class SQLiteStatement extends Finalizable {
 		return this;
 	}
 
+	/**
+	 * Bind the `index`th parameter with the provided value, as an number.
+	 * 
+	 * @return Self, for chaining calls.
+	 */
 	public function bindInt(index:Int, value:Int):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
@@ -89,6 +114,11 @@ class SQLiteStatement extends Finalizable {
 		return this;
 	}
 
+	/**
+	 * Bind the `index`th parameter with the provided value, as a 64-bit number.
+	 * 
+	 * @return Self, for chaining calls.
+	 */
 	public function bindInt64(index:Int, value:Int64):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
@@ -98,6 +128,11 @@ class SQLiteStatement extends Finalizable {
 		return this;
 	}
 
+	/**
+	 * Bind the `index`th parameter with the provided value, as a floating point value.
+	 * 
+	 * @return Self, for chaining calls.
+	 */
 	public function bindFloat(index:Int, value:Float):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
@@ -108,17 +143,17 @@ class SQLiteStatement extends Finalizable {
 	}
 
 	/**
-	 * Binds `value` as TEXT, or `NULL` if `value` is null.
+	 * Bind the `index`th parameter with the provided value, as a string (or `NULL` if the input is null).
+	 * 
+	 * @return Self, for chaining calls.
 	 */
 	public function bindString(index:Int, value:Null<String>):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 		if (value == null) return bindNull(index);
 
-		// Bind the full UTF-8 encoding with its length, so text containing NUL characters is not cut short.
-		// (The implicit `ConstCharStar` conversion stops at the first NUL for non-ASCII strings.)
+		// Convert the string to bytes to prevent issues with 0x0 / non-ASCII characters.
 		var utf8 = Bytes.ofString(value);
 		if (utf8.length == 0) {
-			// Bind a literal rather than taking the address of an empty buffer (see `bindBytes`).
 			var result:SQLiteResultCode = sqlite3_bind_text(statement.raw, index, "", 0, SQLITE_TRANSIENT);
 			if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 		} else {
@@ -130,7 +165,9 @@ class SQLiteStatement extends Finalizable {
 	}
 
 	/**
-	 * Binds `value` as a BLOB, or `NULL` if `value` is null.
+	 * Bind the `index`th parameter with the provided value, as a binary blob (or `NULL` if the input is null).
+	 * 
+	 * @return Self, for chaining calls.
 	 */
 	public function bindBytes(index:Int, value:Null<Bytes>):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
@@ -149,7 +186,9 @@ class SQLiteStatement extends Finalizable {
 	}
 
 	/**
-	 * Binds a value at a given index as `NULL`.
+	 * Binds the `index`th parameter with `NULL`.
+	 * 
+	 * @return Self, for chaining calls.
 	 */
 	private function bindNull(index:Int):SQLiteStatement {
 		var result:SQLiteResultCode = sqlite3_bind_null(statement.raw, index);
@@ -157,13 +196,27 @@ class SQLiteStatement extends Finalizable {
 		return this;
 	}
 
-	public function executeStatement() {
-		if (statement == null) throw new Exception("Statement is closed");
+	/**
+	 * Resets the statement and runs it to completion.
+	 * Any rows it returns are discarded, use `executeQuery()` if you care about the results.
+	 */
+	public function executeStatement():Void {
+		reset();
 
-		var result:SQLiteResultCode = sqlite3_step(statement.raw);
+		var result:SQLiteResultCode = step();
+		while (result == SQLiteResultCode.ROW) {
+			result = step();
+		}
 		if (result != SQLiteResultCode.DONE) throwStepError(sqlite3_errmsg(owner.db.raw));
 	}
 
+	/**
+	 * Advance the statement to the next result row.
+	 */
+	private function step():SQLiteResultCode {
+		stepErrorThrown = false;
+		return sqlite3_step(statement.raw);
+	}
 
 	/**
 	 * Throw an error resulting from a call to `sqlite3_step()`,
@@ -174,36 +227,55 @@ class SQLiteStatement extends Finalizable {
 		throw new Exception(message);
 	}
 
+	/**
+	 * Resets the statement and runs it with the provided parameters.
+	 * 
+	 * @returns An `Iterator<Dynamic>` over each row in the query results.
+	 * 	 The rows are anonymous structures, where each column is a field on the object.
+	 */
 	public function executeQuery():Iterator<Dynamic> {
-		if (statement == null) throw new Exception("Statement is closed");
+		reset();
+		var thisExecution:Int = execution;
 
+		var status:SQLiteResultCode = step();
+		if (status != SQLiteResultCode.ROW && status != SQLiteResultCode.DONE) throwStepError(sqlite3_errmsg(owner.db.raw));
+
+		// Read the columns after the first step, since that step recompiles the statement if the schema changed.
 		var columnCount = sqlite3_column_count(statement.raw);
 		var columnNames = new Vector<String>(columnCount);
 		for (i in 0...columnCount) {
 			columnNames[i] = sqlite3_column_name(statement.raw, i);
 		}
 
-		var status:SQLiteResultCode = sqlite3_step(statement.raw);
-		if (status != SQLiteResultCode.ROW && status != SQLiteResultCode.DONE) throwStepError(sqlite3_errmsg(owner.db.raw));
-
 		// An error fetching the next row is kept and thrown by the next `hasNext()` or `next()` call,
 		// so the row already fetched is still returned.
 		var nextRowError:Null<String> = null;
 
+		function checkCurrent():Void {
+			if (statement == null) throw new Exception("Statement is closed");
+			if (execution != thisExecution) throw new Exception("Iterator is out of date: its statement was reset or executed again");
+			if (nextRowError != null) throwStepError(nextRowError);
+		}
+
+		// Returns an Iterator, which provides hasNext() and next().
+		// You can loop over this to fetch values one at a time as needed,
+		// or use Lambda.array() to just get an Array of values.
 		return {
 			hasNext: () -> {
-				if (nextRowError != null) throwStepError(nextRowError);
+				checkCurrent();
 				return status == SQLiteResultCode.ROW;
 			},
 			next: () -> {
-				if (statement == null) throw new Exception("Statement is closed");
-				if (nextRowError != null) throwStepError(nextRowError);
+				checkCurrent();
 
 				switch (status) {
 					case DONE:
+						// We've already read the last row in the query results.
 						return null;
+
 					case ROW:
-						var data = {};
+						// Read the next row in the query results.
+						var data:Dynamic = {};
 						for (i in 0...columnCount) {
 							var type:SQLiteColumnType = sqlite3_column_type(statement.raw, i);
 							switch (type) {
@@ -218,13 +290,10 @@ class SQLiteStatement extends Finalizable {
 								case FLOAT:
 									Reflect.setField(data, columnNames[i], sqlite3_column_double(statement.raw, i));
 								case TEXT:
-									// Read the byte count after the text, as SQLite recommends, so embedded NULs are kept.
 									var text:ConstPointer<Char> = ConstPointer.fromRaw(sqlite3_column_text(statement.raw, i)).reinterpret();
 									var textBytes:Int = sqlite3_column_bytes(statement.raw, i);
 									Reflect.setField(data, columnNames[i], NativeString.fromPointerLen(text, textBytes));
 								case BLOB:
-									// Copy into GC-owned Bytes: SQLite frees its buffer at the next step.
-									// Read the byte count after the blob, as SQLite recommends.
 									var blob:RawConstPointer<cpp.Void> = sqlite3_column_blob(statement.raw, i);
 									var size:Int = sqlite3_column_bytes(statement.raw, i);
 									var bytes = Bytes.alloc(size);
@@ -239,11 +308,12 @@ class SQLiteStatement extends Finalizable {
 									throw new Exception('Unknown column type ${type}');
 							}
 						}
-						status = sqlite3_step(statement.raw);
+						status = step();
 						if (status != SQLiteResultCode.ROW && status != SQLiteResultCode.DONE) {
 							nextRowError = sqlite3_errmsg(owner.db.raw);
 						}
 						return data;
+						
 					case _:
 						// Unreachable: errors are thrown above, before the status is read.
 						throw new Exception('Unexpected step result ${status}');
