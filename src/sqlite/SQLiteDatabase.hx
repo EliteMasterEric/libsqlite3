@@ -6,6 +6,7 @@ import cpp.ConstCharStar;
 import cpp.Pointer;
 import cpp.RawPointer;
 import cpp.vm.Gc;
+import cpp.vm.WeakRef;
 import haxe.Int64;
 import sqlite._internal.RawSQLite;
 import sqlite._internal.RawSQLite.*;
@@ -25,9 +26,18 @@ class SQLiteDatabase {
 	private var db:Pointer<RawSQLite>;
 
 	/**
-	 * A list of statements on this database connection that are still open.
+	 * Maintain weak references to the statements on this connection that are still open.
+	 * `close()` needs to ensure all statements are finalized.
+	 * Entries that have already been closed and cleaned up are ignored.
 	 */
-	private var statements:Array<SQLiteStatement> = [];
+	private var statements:Array<WeakRef<SQLiteStatement>> = [];
+
+	/**
+	 * Calling `prepare()` cleans up the list only once `statements` reaches this length.
+	 */
+	private var pruneLength:Int = MIN_PRUNE_LENGTH;
+
+	private static inline final MIN_PRUNE_LENGTH:Int = 16;
 
 	/**
 	 * Use `SQLite.open(path)` to connect to a database.
@@ -35,7 +45,7 @@ class SQLiteDatabase {
 	@:allow(sqlite.SQLite)
 	private function new(db:Pointer<RawSQLite>) {
 		this.db = db;
-				// Set a function to call when garbage collecting this object.
+		// Set a function to call when garbage collecting this object.
 		Gc.setFinalizer(this, Callable.fromStaticFunction(onCollected));
 	}
 
@@ -57,10 +67,13 @@ class SQLiteDatabase {
 	public function close():Void {
 		if (db == null) return;
 
-		// Iterate a copy of the statements array, so we don't modify the array we're iterating.
-		for (statement in statements.copy()) {
-			statement.close();
+		// Close each remaining unclosed statement.
+		// onStatementClosed modifies this in place while we work, so we need to iterate a copy.
+		for (ref in statements.copy()) {
+			var statement = ref.get();
+			if (statement != null) statement.close();
 		}
+		statements = [];
 
 		var result:SQLiteResultCode = sqlite3_close_v2(db.raw);
 		if (result != SQLiteResultCode.OK) {
@@ -106,13 +119,26 @@ class SQLiteDatabase {
 		}
 
 		var stmt = new SQLiteStatement(this, Pointer.fromRaw(rawStatement));
-		statements.push(stmt);
+
+		// Prune
+		if (statements.length >= pruneLength) {
+			statements = statements.filter(ref -> ref.get() != null);
+			pruneLength = Std.int(Math.max(MIN_PRUNE_LENGTH, statements.length * 2));
+		}
+
+		statements.push(new WeakRef(stmt));
 		return stmt;
 	}
 
 	// Called by `SQLiteStatement.close()` once the statement is finalized.
 	private function onStatementClosed(stmt:SQLiteStatement):Void {
-		statements.remove(stmt);
+		// Remove the closed statement from `statements`
+		for (i in 0...statements.length) {
+			if (statements[i].get() == stmt) {
+				statements.splice(i, 1);
+				return;
+			}
+		}
 	}
 
 	public function lastInsertRowId():Int64 {

@@ -53,6 +53,23 @@ class TestUnclosedDatabase extends Test {
 		deleteDatabase(path);
 	}
 
+	// The connection must not keep its statements alive, so a dropped statement is collected while the connection
+	// is still open.
+	function testStatementCollectedWhileDatabaseOpen() {
+		var path = createDatabase("unclosed-stmt.db");
+		var db = SQLite.open(path);
+		var insert = db.prepare("INSERT INTO t (x) VALUES (1), (2), (3)");
+		insert.executeStatement();
+		insert.close();
+		runInThread(() -> {
+			db.prepare("SELECT x FROM t").executeQuery().next();
+		});
+		Assert.isFalse(canWrite(path));
+		Assert.isTrue(collectUntilWritable(path));
+		db.close();
+		deleteDatabase(path);
+	}
+
 	// Collecting a database and statements that were already closed must not close them a second time.
 	function testClosedObjectsCollectedSafely() {
 		runInThread(() -> {

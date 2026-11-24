@@ -40,6 +40,8 @@ class TestAll {
 		runner.addCase(new TestStaleIterator());
 		runner.addCase(new TestSchemaChange());
 		runner.addCase(new TestStepErrorFlag());
+		runner.addCase(new TestPrepareNul());
+		runner.addCase(new TestPrepareTailGc());
 
 		Report.create(runner, SuccessResultsDisplayMode.AlwaysShowSuccessResults, HeaderDisplayMode.NeverShowHeader);
 		runner.run();

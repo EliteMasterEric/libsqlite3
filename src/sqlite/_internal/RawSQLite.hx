@@ -82,9 +82,9 @@ extern class RawSQLite {
 	@:native("sqlite3_reset") static function sqlite3_reset(stmt:RawPointer<RawSQLiteStatement>):Int;
 	@:native("sqlite3_finalize") static function sqlite3_finalize(stmt:RawPointer<RawSQLiteStatement>):Int;
 	@:native("sqlite3_sql") static function sqlite3_sql(stmt:RawPointer<RawSQLiteStatement>):ConstCharStar;
-	// The result must be freed with `sqlite3_free`.
 	@:native("sqlite3_expanded_sql") static function sqlite3_expanded_sql(stmt:RawPointer<RawSQLiteStatement>):RawPointer<Char>;
 	@:native("sqlite3_stmt_readonly") static function sqlite3_stmt_readonly(stmt:RawPointer<RawSQLiteStatement>):Int;
+	@:native("sqlite3_stmt_busy") static function sqlite3_stmt_busy(stmt:RawPointer<RawSQLiteStatement>):Int;
 
 	// Binding parameters (indexes start at 1)
 	@:native("sqlite3_bind_int") static function sqlite3_bind_int(stmt:RawPointer<RawSQLiteStatement>, index:Int, value:Int):Int;

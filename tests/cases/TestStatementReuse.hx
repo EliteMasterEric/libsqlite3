@@ -3,6 +3,8 @@ package cases;
 import cases.util.RecordUtils;
 import haxe.Int64;
 import sqlite.SQLite;
+import sqlite.SQLiteException;
+import sqlite.SQLiteResultCode;
 import utest.Assert;
 import utest.Test;
 
@@ -54,6 +56,41 @@ class TestStatementReuse extends Test {
 		var query = db.prepare("SELECT ? * 2 AS v");
 		Assert.equals(4, query.bindInt(1, 2).executeQuery().next().v);
 		Assert.equals(10, query.reset().bindInt(1, 5).executeQuery().next().v);
+		db.close();
+	}
+
+	function testBindNull() {
+		var db = SQLite.open(":memory:");
+		var query = db.prepare("SELECT ? IS NULL AS v");
+		Assert.equals(0, query.bindInt(1, 3).executeQuery().next().v);
+		Assert.equals(1, query.reset().bindNull(1).executeQuery().next().v);
+		db.close();
+	}
+
+	function testClearBindings() {
+		var db = SQLite.open(":memory:");
+		var query = db.prepare("SELECT ? IS NULL AND ? IS NULL AS v");
+		Assert.equals(0, query.bindInt(1, 1).bindString(2, "a").executeQuery().next().v);
+		// `reset()` keeps the bound values; `clearBindings()` sets them back to NULL.
+		Assert.equals(0, query.reset().executeQuery().next().v);
+		Assert.equals(1, query.reset().clearBindings().executeQuery().next().v);
+		db.close();
+	}
+
+	// A running statement holds shallow copies of its bound values, so clearing them mid-iteration must throw.
+	function testClearBindingsWhileExecutingThrows() {
+		var db = SQLite.open(":memory:");
+		var query = db.prepare("SELECT ? AS v FROM (SELECT 1 UNION ALL SELECT 2)").bindString(1, "value");
+		var rows = query.executeQuery();
+		Assert.equals("value", rows.next().v);
+
+		try {
+			query.clearBindings();
+			Assert.fail("clearBindings() did not throw");
+		} catch (e:SQLiteException) {
+			Assert.equals(SQLiteResultCode.MISUSE, e.code);
+		}
+		Assert.equals("value", rows.next().v);
 		db.close();
 	}
 

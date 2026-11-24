@@ -6,6 +6,8 @@
 
 A set of `sqlite3` externs for HXCPP.
 
+Originally based on code by [Stellation7](https://github.com/davidgiven/stellation/blob/stellation7/src/runtime/cpp/Sqlite.hx) and [Ian Harrigan](https://github.com/core-haxe/libsqlite3).
+
 ## Usage
 
 Add `-lib libsqlite3` to your build. The library only supports the C++ (hxcpp) target.

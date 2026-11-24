@@ -35,7 +35,8 @@ class SQLiteException extends Exception {
 	}
 
 	/**
-	 * References the connection and produces an exception wiith that connection's most recent error code and error message.
+	 * References the connection and produces an exception,
+	 * with that connection's most recent error code and error message.
 	 */
 	@:allow(sqlite)
 	private static function fromConnection(db:RawPointer<RawSQLite>):SQLiteException {

@@ -21,8 +21,8 @@ import haxe.ds.Vector;
  * 
  * NOTES:
  * - Bind values and execute the query rather than concatenating strings to avoid SQL injection attacks.
- * - 
- * - Call `reset()` and you can bind new values and reuse the query object!
+ * - Call `executeStatement()` to ignore results or `executeQuery()` to get result rows to iterate over.
+ * - Call `clearBindings()` and you can bind new values and reuse the query object!
  * @see https://www.sqlite.org/cintro.html
  */
 @:unreflective
@@ -44,8 +44,7 @@ class SQLiteStatement {
 	private var stepErrorThrown:Bool = false;
 
 	/**
-	 * Increments every time `reset()` gets thrown.
-	 * If an old `Iterator<Dynamic>` returned by `executeQuery()` is reused 
+	 * Increments every time `reset()` gets called.
 	 */
 	private var execution:Int = 0;
 
@@ -102,7 +101,7 @@ class SQLiteStatement {
 	}
 
 	/**
-	 * Bind the `index`th parameter with the provided value, as an number.
+	 * Bind the `index`th parameter with the provided value, as a 32-bit number.
 	 * 
 	 * @return Self, for chaining calls.
 	 */
@@ -188,12 +187,35 @@ class SQLiteStatement {
 
 	/**
 	 * Binds the `index`th parameter with `NULL`.
-	 * 
+	 *
 	 * @return Self, for chaining calls.
 	 */
-	private function bindNull(index:Int):SQLiteStatement {
+	public function bindNull(index:Int):SQLiteStatement {
+		checkOpen();
+
 		var result:SQLiteResultCode = sqlite3_bind_null(statement.raw, index);
 		if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
+		return this;
+	}
+
+	/**
+	 * Sets every parameter back to `NULL`.
+	 * `reset()` resets the statement while keeping bound values,
+	 * so call this to reuse the prepared statement with new values!.
+	 * 
+	 * Throws if the statement is in the middle of executing, make sure to call `reset()` first.
+	 * @return Self, for chaining calls.
+	 */
+	public function clearBindings():SQLiteStatement {
+		checkOpen();
+
+		// A running statement holds shallow copies of its bound values, which clearing them would free.
+		if (sqlite3_stmt_busy(statement.raw) != 0) {
+			throw new SQLiteException("Cannot clear bindings while the statement is executing; call reset() first", SQLiteResultCode.MISUSE);
+		}
+
+		// Always returns SQLITE_OK for a valid statement.
+		sqlite3_clear_bindings(statement.raw);
 		return this;
 	}
 
@@ -233,7 +255,7 @@ class SQLiteStatement {
 	}
 
 	/**
-	 * Resets the statement and runs it with the provided parameters.
+	 * Resets the statement and runs it with the bound parameters.
 	 * 
 	 * @returns An `Iterator<Dynamic>` over each row in the query results.
 	 * 	 The rows are anonymous structures, where each column is a field on the object.

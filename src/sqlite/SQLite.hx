@@ -8,8 +8,6 @@ import sqlite._internal.RawSQLite.*;
 
 /**
  * Call `SQLite.open(path)` to get an SQLite Database object to perform queries on.
- * 
- * @see https://github.com/davidgiven/stellation/blob/stellation7/src/runtime/cpp/Sqlite.hx
  */
 @:unreflective
 class SQLite {
