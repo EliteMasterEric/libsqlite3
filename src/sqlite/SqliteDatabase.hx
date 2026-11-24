@@ -1,13 +1,20 @@
 package sqlite;
 
+#if cpp
 import cpp.ConstCharStar;
 import cpp.Finalizable;
 import cpp.Pointer;
 import cpp.RawPointer;
 import haxe.Exception;
-import sqlite.RawSqlite.*;
-import sqlite.RawSqlite.RawSqliteStmt;
+import sqlite._internal.RawSqlite;
+import sqlite._internal.RawSqlite.*;
+import sqlite._internal.RawSqliteStatement;
 
+/**
+ * Represents an SQLite database that is currently loaded.
+ * 
+ * Call `prepare(sql)` to create a prepared statement, bind values to it, then execute the query.
+ */
 @:unreflective
 class SqliteDatabase extends Finalizable {
 	private var db:Pointer<RawSqlite>;
@@ -40,7 +47,7 @@ class SqliteDatabase extends Finalizable {
 	public function prepare(sql:String):SqliteStatement {
 		var stmt = cache[sql];
 		if (stmt == null) {
-			var rawstmt:RawPointer<RawSqliteStmt> = null;
+			var rawstmt:RawPointer<RawSqliteStatement> = null;
 			var rawtail:ConstCharStar = null;
 
 			var i = sqlite3_prepare_v2(db.raw, sql, -1, RawPointer.addressOf(rawstmt), RawPointer.addressOf(rawtail));
@@ -72,3 +79,4 @@ class SqliteDatabase extends Finalizable {
 		return sqlite3_changes(db.raw);
 	}
 }
+#end

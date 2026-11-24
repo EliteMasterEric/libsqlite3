@@ -3,4 +3,5 @@
 <a href="https://github.com/EliteMasterEric/libsqlite3/actions/workflows/mac.yaml"><img src="https://github.com/EliteMasterEric/libsqlite3/actions/workflows/mac.yaml/badge.svg">
 
 # libsqlite3
-sqlite3 externs for hxcpp
+
+A set of `sqlite3` externs for HXCPP.

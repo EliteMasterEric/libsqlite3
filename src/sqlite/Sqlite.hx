@@ -1,11 +1,17 @@
 package sqlite;
 
+#if cpp
 import cpp.Pointer;
 import cpp.RawPointer;
 import haxe.Exception;
-import sqlite.RawSqlite.*;
+import sqlite._internal.RawSqlite;
+import sqlite._internal.RawSqlite.*;
 
-// adapted somewhat from: https://github.com/davidgiven/stellation/blob/stellation7/src/runtime/cpp/Sqlite.hx
+/**
+ * Call `Sqlite.open(path)` to get an SQLite Database object to perform queries on.
+ * 
+ * @see https://github.com/davidgiven/stellation/blob/stellation7/src/runtime/cpp/Sqlite.hx
+ */
 @:unreflective
 class Sqlite {
 	public static final DONE:Int = untyped __cpp__("SQLITE_DONE");
@@ -27,3 +33,4 @@ class Sqlite {
 		return new SqliteDatabase(Pointer.fromRaw(db));
 	}
 }
+#end

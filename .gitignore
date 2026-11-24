@@ -1,3 +1,4 @@
 build/
 persons.db
+persons.db-journal
 .vscode/

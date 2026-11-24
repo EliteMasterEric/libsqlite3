@@ -9,16 +9,22 @@ import haxe.io.Bytes;
 import haxe.Exception;
 import cpp.Pointer;
 import cpp.Finalizable;
-import sqlite.RawSqlite.*;
-import sqlite.RawSqlite.RawSqliteStmt;
+import sqlite._internal.RawSqlite;
+import sqlite._internal.RawSqlite.*;
+import sqlite._internal.RawSqliteStatement;
 import haxe.ds.Vector;
 
+/**
+ * Represents a prepared SQL statement to be performed.
+ * Bind values and execute the query rather than concatenating strings to avoid SQL injection attacks.
+ * Returns an `Iterator<Dynamic>` when the statement is executed, use this to count and view the results.
+ */
 @:unreflective
 class SqliteStatement extends Finalizable {
 	private var db:Pointer<RawSqlite>;
-	private var stmt:Pointer<RawSqliteStmt>;
+	private var stmt:Pointer<RawSqliteStatement>;
 
-	public function new(db:Pointer<RawSqlite>, stmt:Pointer<RawSqliteStmt>) {
+	public function new(db:Pointer<RawSqlite>, stmt:Pointer<RawSqliteStatement>) {
 		super();
 		this.db = db;
 		this.stmt = stmt;
