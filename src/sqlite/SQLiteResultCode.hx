@@ -1,7 +1,10 @@
 package sqlite;
 
+import sqlite.SQLiteExtendedResultCode;
+
 /**
  * SQLite's primary result codes. `sqlite3_*` functions return these.
+ * Can indicate success or a specific type of failure.
  *
  * @see https://www.sqlite.org/rescode.html
  */
@@ -45,4 +48,10 @@ enum abstract SQLiteResultCode(Int) from Int to Int {
 	 * `sqlite3_step` finished executing the statement.
 	 */
 	var DONE = 101;
+
+	@:to(SQLiteExtendedResultCode)
+	public function toExtendedResultCode():SQLiteExtendedResultCode {
+		// NOTE: This doesn't include any of the extended info!
+		return this;
+	}
 }

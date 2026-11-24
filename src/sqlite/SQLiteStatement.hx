@@ -8,7 +8,6 @@ import cpp.RawConstPointer;
 import cpp.Stdlib;
 import cpp.NativeArray;
 import haxe.io.Bytes;
-import haxe.Exception;
 import haxe.Int64;
 import cpp.Pointer;
 import cpp.Finalizable;
@@ -86,7 +85,7 @@ class SQLiteStatement extends Finalizable {
 	 * Throws a step error of the last execution that was not already thrown.
 	 */
 	public function reset():SQLiteStatement {
-		if (statement == null) throw new Exception("Statement is closed");
+		checkOpen();
 
 		execution++;
 		var result:SQLiteResultCode = sqlite3_reset(statement.raw);
@@ -94,7 +93,7 @@ class SQLiteStatement extends Finalizable {
 		var alreadyThrown = stepErrorThrown;
 		stepErrorThrown = false;
 		if (result != SQLiteResultCode.OK && !alreadyThrown) {
-			throw new Exception(sqlite3_errmsg(owner.db.raw));
+			throw SQLiteException.fromConnection(owner.db.raw);
 		}
 
 		return this;
@@ -106,10 +105,10 @@ class SQLiteStatement extends Finalizable {
 	 * @return Self, for chaining calls.
 	 */
 	public function bindInt(index:Int, value:Int):SQLiteStatement {
-		if (statement == null) throw new Exception("Statement is closed");
+		checkOpen();
 
 		var result:SQLiteResultCode = sqlite3_bind_int(statement.raw, index, value);
-		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
 
 		return this;
 	}
@@ -120,10 +119,10 @@ class SQLiteStatement extends Finalizable {
 	 * @return Self, for chaining calls.
 	 */
 	public function bindInt64(index:Int, value:Int64):SQLiteStatement {
-		if (statement == null) throw new Exception("Statement is closed");
+		checkOpen();
 
 		var result:SQLiteResultCode = sqlite3_bind_int64(statement.raw, index, value);
-		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
 
 		return this;
 	}
@@ -134,10 +133,10 @@ class SQLiteStatement extends Finalizable {
 	 * @return Self, for chaining calls.
 	 */
 	public function bindFloat(index:Int, value:Float):SQLiteStatement {
-		if (statement == null) throw new Exception("Statement is closed");
+		checkOpen();
 
 		var result:SQLiteResultCode = sqlite3_bind_double(statement.raw, index, value);
-		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
 
 		return this;
 	}
@@ -148,18 +147,18 @@ class SQLiteStatement extends Finalizable {
 	 * @return Self, for chaining calls.
 	 */
 	public function bindString(index:Int, value:Null<String>):SQLiteStatement {
-		if (statement == null) throw new Exception("Statement is closed");
+		checkOpen();
 		if (value == null) return bindNull(index);
 
 		// Convert the string to bytes to prevent issues with 0x0 / non-ASCII characters.
 		var utf8 = Bytes.ofString(value);
 		if (utf8.length == 0) {
 			var result:SQLiteResultCode = sqlite3_bind_text(statement.raw, index, "", 0, SQLITE_TRANSIENT);
-			if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+			if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
 		} else {
 			var p:Pointer<Char> = NativeArray.address(utf8.getData(), 0).reinterpret();
 			var result:SQLiteResultCode = sqlite3_bind_text(statement.raw, index, cast p.raw, utf8.length, SQLITE_TRANSIENT);
-			if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+			if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
 		}
 		return this;
 	}
@@ -170,7 +169,7 @@ class SQLiteStatement extends Finalizable {
 	 * @return Self, for chaining calls.
 	 */
 	public function bindBytes(index:Int, value:Null<Bytes>):SQLiteStatement {
-		if (statement == null) throw new Exception("Statement is closed");
+		checkOpen();
 		if (value == null) return bindNull(index);
 
 		var result:SQLiteResultCode;
@@ -181,7 +180,7 @@ class SQLiteStatement extends Finalizable {
 			var p:Pointer<cpp.Void> = NativeArray.address(value.getData(), 0).reinterpret();
 			result = sqlite3_bind_blob(statement.raw, index, p.raw, value.length, SQLITE_TRANSIENT);
 		}
-		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
 		return this;
 	}
 
@@ -192,7 +191,7 @@ class SQLiteStatement extends Finalizable {
 	 */
 	private function bindNull(index:Int):SQLiteStatement {
 		var result:SQLiteResultCode = sqlite3_bind_null(statement.raw, index);
-		if (result != SQLiteResultCode.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+		if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
 		return this;
 	}
 
@@ -207,7 +206,7 @@ class SQLiteStatement extends Finalizable {
 		while (result == SQLiteResultCode.ROW) {
 			result = step();
 		}
-		if (result != SQLiteResultCode.DONE) throwStepError(sqlite3_errmsg(owner.db.raw));
+		if (result != SQLiteResultCode.DONE) throwStepError(SQLiteException.fromConnection(owner.db.raw));
 	}
 
 	/**
@@ -222,9 +221,13 @@ class SQLiteStatement extends Finalizable {
 	 * Throw an error resulting from a call to `sqlite3_step()`,
 	 * then remember we did that so `sqlite3_reset()` doesn't rethrow the same error.
 	 */
-	private function throwStepError(message:String):Void {
+	private function throwStepError(error:SQLiteException):Void {
 		stepErrorThrown = true;
-		throw new Exception(message);
+		throw error;
+	}
+
+	private function checkOpen():Void {
+		if (statement == null) throw new SQLiteException("Statement is closed", SQLiteResultCode.MISUSE);
 	}
 
 	/**
@@ -238,7 +241,7 @@ class SQLiteStatement extends Finalizable {
 		var thisExecution:Int = execution;
 
 		var status:SQLiteResultCode = step();
-		if (status != SQLiteResultCode.ROW && status != SQLiteResultCode.DONE) throwStepError(sqlite3_errmsg(owner.db.raw));
+		if (status != SQLiteResultCode.ROW && status != SQLiteResultCode.DONE) throwStepError(SQLiteException.fromConnection(owner.db.raw));
 
 		// Read the columns after the first step, since that step recompiles the statement if the schema changed.
 		var columnCount = sqlite3_column_count(statement.raw);
@@ -249,11 +252,14 @@ class SQLiteStatement extends Finalizable {
 
 		// An error fetching the next row is kept and thrown by the next `hasNext()` or `next()` call,
 		// so the row already fetched is still returned.
-		var nextRowError:Null<String> = null;
+		// It is read when the row fails, since later calls on the connection replace the connection's error.
+		var nextRowError:Null<SQLiteException> = null;
 
 		function checkCurrent():Void {
-			if (statement == null) throw new Exception("Statement is closed");
-			if (execution != thisExecution) throw new Exception("Iterator is out of date: its statement was reset or executed again");
+			checkOpen();
+			if (execution != thisExecution) {
+				throw new SQLiteException("Iterator is out of date: its statement was reset or executed again", SQLiteResultCode.MISUSE);
+			}
 			if (nextRowError != null) throwStepError(nextRowError);
 		}
 
@@ -305,18 +311,18 @@ class SQLiteStatement extends Finalizable {
 								case NULL:
 									Reflect.setField(data, columnNames[i], null);
 								case _:
-									throw new Exception('Unknown column type ${type}');
+									throw new SQLiteException('Unknown column type ${type}', SQLiteResultCode.INTERNAL);
 							}
 						}
 						status = step();
 						if (status != SQLiteResultCode.ROW && status != SQLiteResultCode.DONE) {
-							nextRowError = sqlite3_errmsg(owner.db.raw);
+							nextRowError = SQLiteException.fromConnection(owner.db.raw);
 						}
 						return data;
 						
 					case _:
 						// Unreachable: errors are thrown above, before the status is read.
-						throw new Exception('Unexpected step result ${status}');
+						throw new SQLiteException('Unexpected step result ${status}', SQLiteResultCode.INTERNAL);
 				}
 			}
 		}

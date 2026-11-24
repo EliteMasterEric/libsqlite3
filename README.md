@@ -44,3 +44,5 @@ Column values map to Haxe types:
 - `TEXT`: `String`
 - `BLOB`: `haxe.io.Bytes`
 - `NULL`: `null`
+
+Errors are thrown as `sqlite.SQLiteException`, which carries SQLite's result code.

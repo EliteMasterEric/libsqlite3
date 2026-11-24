@@ -22,6 +22,7 @@ class TestAll {
 		runner.addCase(new TestStatementReuse());
 		runner.addCase(new TestErrors());
 		runner.addCase(new TestConnection());
+		runner.addCase(new TestErrorCodes());
 
 		runner.addCase(new TestUseAfterClose());
 		runner.addCase(new TestNoTruncation());

@@ -5,7 +5,6 @@ import cpp.ConstCharStar;
 import cpp.Finalizable;
 import cpp.Pointer;
 import cpp.RawPointer;
-import haxe.Exception;
 import haxe.Int64;
 import sqlite._internal.RawSQLite;
 import sqlite._internal.RawSQLite.*;
@@ -59,26 +58,26 @@ class SQLiteDatabase extends Finalizable {
 		var result:SQLiteResultCode = sqlite3_close_v2(db.raw);
 		if (result != SQLiteResultCode.OK) {
 			// Throw an error if SQLite can't close the connection.
-			throw new Exception(sqlite3_errmsg(db.raw));
+			throw SQLiteException.fromConnection(db.raw);
 		}
 
 		db = null;
 	}
 
 	public function prepare(sql:String):SQLiteStatement {
-		if (db == null) throw new Exception("Database is closed");
+		checkOpen();
 
 		var rawStatement:RawPointer<RawSQLiteStatement> = null;
 		var rawTail:ConstCharStar = null;
 
 		var result:SQLiteResultCode = sqlite3_prepare_v2(db.raw, sql, -1, RawPointer.addressOf(rawStatement), RawPointer.addressOf(rawTail));
 		if (result != SQLiteResultCode.OK) {
-			throw new Exception(sqlite3_errmsg(db.raw));
+			throw SQLiteException.fromConnection(db.raw);
 		}
 
 		// SQLite returns `null` if the resulting statement was empty (or only had comments)
 		if (rawStatement == null) {
-			throw new Exception("No SQL statement to prepare");
+			throw new SQLiteException("No SQL statement to prepare", SQLiteResultCode.MISUSE);
 		}
 
 		// Ensure an error is thrown if some of the statement is left trailing.
@@ -93,7 +92,7 @@ class SQLiteDatabase extends Finalizable {
 				if (result != SQLiteResultCode.OK) message += ' (${(sqlite3_errmsg(db.raw) : String)})';
 				sqlite3_finalize(restStatement);
 				sqlite3_finalize(rawStatement);
-				throw new Exception(message);
+				throw new SQLiteException(message, SQLiteResultCode.MISUSE);
 			}
 			// Stop once SQLite consumes nothing more.
 			if (restTail == rest) break;
@@ -110,14 +109,18 @@ class SQLiteDatabase extends Finalizable {
 	}
 
 	public function lastInsertRowId():Int64 {
-		if (db == null) throw new Exception("Database is closed");
+		checkOpen();
 		return sqlite3_last_insert_rowid(db.raw);
 	}
 
 	public function changes():Int64 {
-		if (db == null) throw new Exception("Database is closed");
-		
+		checkOpen();
+
 		return sqlite3_changes64(db.raw);
+	}
+
+	private function checkOpen():Void {
+		if (db == null) throw new SQLiteException("Database is closed", SQLiteResultCode.MISUSE);
 	}
 }
 #end
