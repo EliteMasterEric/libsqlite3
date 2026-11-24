@@ -1,12 +1,12 @@
 package sqlite;
 
+#if cpp
 import cpp.Char;
 import cpp.ConstPointer;
 import cpp.NativeString;
 import cpp.UInt8;
 import cpp.RawConstPointer;
 import cpp.NativeArray;
-import haxe.io.BytesData;
 import haxe.io.Bytes;
 import haxe.Exception;
 import haxe.Int64;
@@ -34,16 +34,17 @@ class SQLiteStatement extends Finalizable {
 	 */
 	private var statement:Pointer<RawSQLiteStatement>;
 
+	/**
+	 * If `sqlite3_step` already threw an error, prevent `reset()` from throwing again.
+	 */
+	private var stepErrorThrown:Bool = false;
+
 	private function new(owner:SQLiteDatabase, statement:Pointer<RawSQLiteStatement>) {
 		super();
 		this.owner = owner;
 		this.statement = statement;
 	}
 
-	/**
-	 * Runs only once the owning database is unreachable too, since the database keeps every open statement.
-	 * Touches no other GC object, because the database may already be finalized.
-	 */
 	public override function finalize() {
 		if (statement != null) {
 			sqlite3_finalize(statement.raw);
@@ -53,8 +54,8 @@ class SQLiteStatement extends Finalizable {
 	}
 
 	/**
-	 * Finalizes the statement and frees its resources. It cannot be used after this.
-	 * Does nothing if the statement is already closed. `SQLiteDatabase.close()` closes all open statements.
+	 * Finalize the statement and frees its resources.
+	 * It cannot be reused after this.
 	 */
 	public function close():Void {
 		if (statement == null) return;
@@ -67,29 +68,42 @@ class SQLiteStatement extends Finalizable {
 
 	public function reset():SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
+
+		var result = sqlite3_reset(statement.raw);
 		
-		sqlite3_reset(statement.raw);
+		var alreadyThrown = stepErrorThrown;
+		stepErrorThrown = false;
+		if (result != SQLite.OK && !alreadyThrown) {
+			throw new Exception(sqlite3_errmsg(owner.db.raw));
+		}
+
 		return this;
 	}
 
 	public function bindInt(index:Int, value:Int):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		sqlite3_bind_int(statement.raw, index, value);
+		var result = sqlite3_bind_int(statement.raw, index, value));
+		if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+
 		return this;
 	}
 
 	public function bindInt64(index:Int, value:Int64):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		sqlite3_bind_int64(statement.raw, index, value);
+		var result = sqlite3_bind_int64(statement.raw, index, value));
+		if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+
 		return this;
 	}
 
 	public function bindFloat(index:Int, value:Float):SQLiteStatement {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		sqlite3_bind_double(statement.raw, index, value);
+		var result = sqlite3_bind_double(statement.raw, index, value));
+		if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
+
 		return this;
 	}
 
@@ -101,10 +115,12 @@ class SQLiteStatement extends Finalizable {
 		var utf8 = Bytes.ofString(value);
 		if (utf8.length == 0) {
 			// A NULL pointer would bind SQL NULL, so pass a literal for the empty string.
-			sqlite3_bind_text(statement.raw, index, "", 0, SQLITE_TRANSIENT);
+			var result = sqlite3_bind_text(statement.raw, index, "", 0, SQLITE_TRANSIENT);
+			if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 		} else {
 			var p:Pointer<Char> = NativeArray.address(utf8.getData(), 0).reinterpret();
-			sqlite3_bind_text(statement.raw, index, cast p.raw, utf8.length, SQLITE_TRANSIENT);
+			var result = sqlite3_bind_text(statement.raw, index, cast p.raw, utf8.length, SQLITE_TRANSIENT);
+			if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 		}
 		return this;
 	}
@@ -114,15 +130,17 @@ class SQLiteStatement extends Finalizable {
 
 		var len = value.length;
 		var p:Pointer<cpp.Void> = NativeArray.address(value.getData(), 0).reinterpret();
-		sqlite3_bind_blob(statement.raw, index, p.raw, len, SQLITE_TRANSIENT);
+		var result = sqlite3_bind_blob(statement.raw, index, p.raw, len, SQLITE_TRANSIENT);
+		if (result != SQLite.OK) throw new Exception(sqlite3_errmsg(owner.db.raw));
 		return this;
 	}
 
 	public function executeStatement() {
 		if (statement == null) throw new Exception("Statement is closed");
 
-		var i = sqlite3_step(statement.raw);
-		if (i != SQLite.DONE) {
+		var result = sqlite3_step(statement.raw);
+		if (result != SQLite.DONE) {
+			stepErrorThrown = true;
 			throw new Exception(sqlite3_errmsg(owner.db.raw));
 		}
 	}
@@ -191,3 +209,4 @@ class SQLiteStatement extends Finalizable {
 		}
 	}
 }
+#end

@@ -15,7 +15,7 @@ class TestPreparedBlob extends Test {
 	function testBasicBlobPreparedInsert() {
 		var db = SQLite.open("persons.db");
 
-		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId, contractDocument) VALUES (?, ?, ?, X'746869732069732061206e657720636f6e747261637420646f63756d656e74')");
+		var stmt = db.prepare("INSERT INTO Person (lastName, firstName, iconId, contractDocument) VALUES (?, ?, ?, ?)");
 		stmt.bindString(1, "new last name");
 		stmt.bindString(2, "new first name");
 		stmt.bindInt(3, 1);

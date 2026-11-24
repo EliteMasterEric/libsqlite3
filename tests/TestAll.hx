@@ -21,7 +21,8 @@ class TestAll {
 
 		runner.addCase(new TestUseAfterClose());
 		runner.addCase(new TestNoTruncation());
-		runner.addCase(new TestUnclosedDatabase());
+		runner.addCase(new TestReturnCodes());
+		runner.addCase(new TestPrepareTrailingText());
 
 		Report.create(runner, SuccessResultsDisplayMode.AlwaysShowSuccessResults, HeaderDisplayMode.NeverShowHeader);
 		runner.run();
