@@ -7,6 +7,8 @@ import cpp.ConstCharStar;
 import cpp.NativeArray;
 import cpp.Pointer;
 import cpp.RawPointer;
+import cpp.Stdlib;
+import cpp.UInt8;
 import cpp.vm.Gc;
 import cpp.vm.WeakRef;
 import haxe.Int64;
@@ -177,6 +179,86 @@ class SQLiteDatabase {
 
 		return sqlite3_changes64(db.raw);
 	}
+
+	/**
+	 * Exports the main database into `Bytes`, in the SQLite file format.
+	 * Works for file and in-memory databases.
+	 * You can use `SQLite.openFromBytes` to load the result later.
+	 * 
+	 * @return The database content.
+	 * @throws SQLiteException `MISUSE` if the database is closed, or the error SQLite reports.
+	 */
+	public function toBytes():Bytes {
+		checkOpen();
+
+		var rawSize:cpp.Int64 = 0;
+		var data:RawPointer<UInt8> = sqlite3_serialize(db.raw, "main", RawPointer.addressOf(rawSize), 0);
+		var size:Int64 = rawSize;
+		if (data == null) {
+			// An empty in-memory database has size 0, and SQLite can't allocate 0 bytes.
+			if (size == 0) return Bytes.alloc(0);
+			// SQLite ran out of memory trying to serialize.
+			if (size > 0) throw new SQLiteException("Out of memory serializing the database", SQLiteResultCode.NOMEM);
+			// SQLite couldn't read the database, such as when it isn't one.
+			throw SQLiteException.fromConnection(db.raw);
+		}
+
+		if (size > 0x7FFFFFFF) {
+			// 2,147,483,647 bytes (~2GB)
+			// The database was too large to export as a single Bytes object.
+			// In a basic database I calculated this as being something like 10 million rows which should be FINE.
+			sqlite3_free(cast data);
+			throw new SQLiteException('Database is too large for Bytes (${size} bytes)', SQLiteResultCode.TOOBIG);
+		}
+
+		var length:Int = Int64.toInt(size);
+		var bytes = Bytes.alloc(length);
+		if (length > 0) {
+			var dest:Pointer<cpp.Void> = NativeArray.address(bytes.getData(), 0).reinterpret();
+			Stdlib.nativeMemcpy(dest.raw, cast data, length);
+		}
+		sqlite3_free(cast data);
+		return bytes;
+	}
+
+	/**
+	 * Replaces this database with the contents of the provided `Bytes.`
+	 * @param bytes Must be a serialized SQLite database, such as the contents of a DB file or the result of `serialize()`.
+	 */
+	@:allow(sqlite.SQLite)
+	private function deserialize(bytes:Bytes, readOnly:Bool):Void {
+		checkOpen();
+
+		var length = bytes.length;
+		// Add some padding to prevent errors with malformed datbases.
+		var bufferSize = length + DESERIALIZE_PADDING;
+		var rawBuffer:RawPointer<cpp.Void> = sqlite3_malloc64(bufferSize);
+		if (rawBuffer == null) throw new SQLiteException("Out of memory loading the database", SQLiteResultCode.NOMEM);
+		var buffer:Pointer<UInt8> = Pointer.fromRaw(rawBuffer).reinterpret();
+		if (length > 0) {
+			var source:Pointer<cpp.Void> = NativeArray.address(bytes.getData(), 0).reinterpret();
+			Stdlib.nativeMemcpy(cast buffer.raw, cast source.raw, length);
+		}
+		for (i in length...bufferSize) {
+			buffer.setAt(i, 0);
+		}
+
+		// FREEONCLOSE ensures SQLite owns the buffer from here on, and frees it even if deserializing fails.
+		var flags = SQLITE_DESERIALIZE_FREEONCLOSE | SQLITE_DESERIALIZE_RESIZEABLE;
+		if (readOnly) flags |= SQLITE_DESERIALIZE_READONLY;
+		var result:SQLiteResultCode = sqlite3_deserialize(db.raw, "main", buffer.raw, length, bufferSize, flags);
+		if (result != SQLiteResultCode.OK) {
+			var error = SQLiteException.fromConnection(db.raw);
+			// Some failures, such as running out of memory, don't record an error on the connection.
+			if (error.code != result) error = new SQLiteException(sqlite3_errstr(result), result);
+			throw error;
+		}
+	}
+
+	/**
+	 * Spare bytes after the content of a deserialized database, as `sqlite3_deserialize` recommends.
+	 */
+	private static inline final DESERIALIZE_PADDING:Int = 20;
 
 	private function checkOpen():Void {
 		if (db == null) throw new SQLiteException("Database is closed", SQLiteResultCode.MISUSE);

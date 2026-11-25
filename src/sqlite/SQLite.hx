@@ -3,6 +3,7 @@ package sqlite;
 #if cpp
 import cpp.Pointer;
 import cpp.RawPointer;
+import haxe.io.Bytes;
 import sqlite._internal.RawSQLite;
 import sqlite._internal.RawSQLite.*;
 
@@ -25,6 +26,28 @@ class SQLite {
 			throw error;
 		}
 		return new SQLiteDatabase(Pointer.fromRaw(db));
+	}
+
+	/**
+	 * Loads an in-memory database from the provided byte data.
+	 * Byte data should be the contents of an SQLite database file, or the output of `SQLiteDatabase.toBytes()`
+	 *
+	 * @param bytes The database content.
+	 * @param readOnly If `true`, writes throw `READONLY`.
+	 * @return The open database.
+	 * @throws SQLiteException `MISUSE` if `bytes` is null, or the error SQLite reports.
+	 */
+	public static function openFromBytes(bytes:Bytes, readOnly:Bool = false):SQLiteDatabase {
+		if (bytes == null) throw new SQLiteException("Database bytes must not be null", SQLiteResultCode.MISUSE);
+
+		var database = open(":memory:");
+		try {
+			database.deserialize(bytes, readOnly);
+		} catch (e:SQLiteException) {
+			database.close();
+			throw e;
+		}
+		return database;
 	}
 }
 #end

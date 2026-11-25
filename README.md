@@ -47,4 +47,19 @@ Column values map to Haxe types:
 - `BLOB`: `haxe.io.Bytes`
 - `NULL`: `null`
 
+### In-memory databases from bytes
+
+`toBytes()` exports a database in the SQLite `.db` file format, and `SQLite.openFromBytes()` lets you load a database from memory, without having to touch the file system.
+
+```haxe
+var file = SQLite.open("example.db");
+var bytes = file.toBytes(); // or sys.io.File.getBytes("example.db")
+file.close();
+
+var db = SQLite.openFromBytes(bytes); // writable, grows as needed
+var readOnly = SQLite.openFromBytes(bytes, true); // writes throw a READONLY exception
+```
+
+Empty bytes give an empty database. Bytes that aren't a database throw `NOTADB` on the first statement that reads them (not when the database is loaded).
+
 Errors are thrown as `sqlite.SQLiteException`, which carries SQLite's result code.

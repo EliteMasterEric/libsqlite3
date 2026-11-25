@@ -6,6 +6,7 @@ import cpp.ConstCharStar;
 import cpp.Int64;
 import cpp.RawConstPointer;
 import cpp.RawPointer;
+import cpp.UInt32;
 import cpp.UInt64;
 import cpp.UInt8;
 
@@ -46,6 +47,7 @@ extern class RawSQLite {
 	// Library
 	@:native("sqlite3_libversion") static function sqlite3_libversion():ConstCharStar;
 	@:native("sqlite3_libversion_number") static function sqlite3_libversion_number():Int;
+	@:native("sqlite3_malloc64") static function sqlite3_malloc64(size:UInt64):RawPointer<cpp.Void>;
 	@:native("sqlite3_free") static function sqlite3_free(ptr:RawPointer<cpp.Void>):Void;
 	@:native("sqlite3_memory_used") static function sqlite3_memory_used():Int64;
 
@@ -144,4 +146,14 @@ extern class RawSQLite {
 		nbyte:Int, offset:Int):Int;
 	@:native("sqlite3_blob_bytes") static function sqlite3_blob_bytes(blob:RawPointer<RawSQLiteBlob>):Int;
 	@:native("sqlite3_blob_close") static function sqlite3_blob_close(blob:RawPointer<RawSQLiteBlob>):Int;
+
+	// Serialization
+	@:native("SQLITE_SERIALIZE_NOCOPY") static var SQLITE_SERIALIZE_NOCOPY:Int;
+	@:native("SQLITE_DESERIALIZE_FREEONCLOSE") static var SQLITE_DESERIALIZE_FREEONCLOSE:Int;
+	@:native("SQLITE_DESERIALIZE_RESIZEABLE") static var SQLITE_DESERIALIZE_RESIZEABLE:Int;
+	@:native("SQLITE_DESERIALIZE_READONLY") static var SQLITE_DESERIALIZE_READONLY:Int;
+	@:native("sqlite3_serialize") static function sqlite3_serialize(db:RawPointer<RawSQLite>, schema:ConstCharStar, size:RawPointer<Int64>,
+		flags:UInt32):RawPointer<UInt8>;
+	@:native("sqlite3_deserialize") static function sqlite3_deserialize(db:RawPointer<RawSQLite>, schema:ConstCharStar, data:RawPointer<UInt8>,
+		dbSize:Int64, bufferSize:Int64, flags:UInt32):Int;
 }

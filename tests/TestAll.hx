@@ -25,6 +25,7 @@ class TestAll {
 		runner.addCase(new TestErrorCodes());
 		runner.addCase(new TestUnicode());
 		runner.addCase(new TestStatementLifecycle());
+		runner.addCase(new TestSerialize());
 
 		runner.addCase(new TestUseAfterClose());
 		runner.addCase(new TestNoTruncation());
