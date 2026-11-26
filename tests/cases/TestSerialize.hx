@@ -6,7 +6,6 @@ import haxe.io.Bytes;
 import sqlite.SQLite;
 import sqlite.SQLiteDatabase;
 import sqlite.SQLiteException;
-import sqlite.SQLiteExtendedResultCode;
 import sqlite.SQLiteResultCode;
 import sys.FileSystem;
 import sys.io.File;
@@ -90,7 +89,7 @@ class TestSerialize extends Test
     var bytes = source.toBytes();
     source.close();
 
-    var db = SQLite.openFromBytes(bytes, true);
+    var db = SQLite.openFromBytes(bytes, {readOnly: true});
     assertSample(db);
     var e = catchError(() -> db.prepare("INSERT INTO t (id) VALUES (2)").executeStatement());
     assertCodes(e, SQLiteResultCode.READONLY, SQLiteExtendedResultCode.READONLY);

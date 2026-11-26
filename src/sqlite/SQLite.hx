@@ -13,10 +13,31 @@ import sqlite._internal.RawSQLite.*;
 @:unreflective
 class SQLite
 {
-  public static function open(path:String):SQLiteDatabase
+  /**
+   * Opens the database file at `path`, creating it if it doesn't exist (see `createIfMissing`).
+   *
+   * @param path The database file.
+   *   Use `":memory:"` for a new in-memory database.
+   * @param options See `SQLiteOpenOptions`.
+   * @return The open database.
+   * @throws SQLiteException `MISUSE` if you try to create a new `readOnly` database.
+   *   otherwise the error SQLite reports, such as `CANTOPEN` for a missing file.
+   */
+  public static function open(path:String, ?options:SQLiteOpenOptions):SQLiteDatabase
   {
+    var readOnly = options?.readOnly ?? false;
+    var createIfMissing = options?.createIfMissing ?? !readOnly;
+    // SQLite doesn't allow READONLY together with CREATE.
+    if (readOnly && createIfMissing)
+    {
+      throw new SQLiteException("A read-only database can't be created if missing", SQLiteResultCode.MISUSE);
+    }
+
+    var flags = readOnly ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE;
+    if (createIfMissing) flags |= SQLITE_OPEN_CREATE;
+
     var db:RawPointer<RawSQLite> = null;
-    var result:SQLiteResultCode = sqlite3_open(path, RawPointer.addressOf(db));
+    var result:SQLiteResultCode = sqlite3_open_v2(path, RawPointer.addressOf(db), flags, null);
     if (result != SQLiteResultCode.OK)
     {
       // Read the error before closing, which frees it.
@@ -36,18 +57,19 @@ class SQLite
    * Byte data should be the contents of an SQLite database file, or the output of `SQLiteDatabase.toBytes()`
    *
    * @param bytes The database content.
-   * @param readOnly If `true`, writes throw `READONLY`.
+   * @param options See `SQLiteOpenOptions`.
    * @return The open database.
    * @throws SQLiteException `MISUSE` if `bytes` is null, or the error SQLite reports.
    */
-  public static function openFromBytes(bytes:Bytes, readOnly:Bool = false):SQLiteDatabase
+  public static function openFromBytes(bytes:Bytes, ?options:SQLiteOpenOptions):SQLiteDatabase
   {
     if (bytes == null) throw new SQLiteException("Database bytes must not be null", SQLiteResultCode.MISUSE);
 
+    // The connection itself stays writable; `deserialize` makes the loaded database read-only.
     var database = open(":memory:");
     try
     {
-      database.deserialize(bytes, readOnly);
+      database.deserialize(bytes, options?.readOnly ?? false);
     }
     catch (e:SQLiteException)
     {
@@ -56,5 +78,28 @@ class SQLite
     }
     return database;
   }
+}
+
+/**
+ * Options for `SQLite.open()` and `SQLite.openFromBytes()`.
+ */
+typedef SQLiteOpenOptions =
+{
+  /**
+   * If `true`, the database will be opened in read-only mode.
+   * Attempted writes will throw an exception.
+   * 
+   * @default `false`
+   */
+  var ?readOnly:Bool;
+
+  /**
+   * If `true`, `SQLite.open()` creates the database file when it doesn't exist.
+   * If `false`, a missing file throws `CANTOPEN`.
+   * Can't be `true` together with `readOnly`. Ignored by `SQLite.openFromBytes()`.
+   *
+   * @default `true`, or `false` when `readOnly` is `true`
+   */
+  var ?createIfMissing:Bool;
 }
 #end

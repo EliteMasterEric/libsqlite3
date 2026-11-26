@@ -58,6 +58,12 @@ extern class RawSQLite
   @:native("sqlite3_memory_used")
   static function sqlite3_memory_used():Int64;
   // Connections
+  @:native("SQLITE_OPEN_READONLY")
+  static var SQLITE_OPEN_READONLY:Int;
+  @:native("SQLITE_OPEN_READWRITE")
+  static var SQLITE_OPEN_READWRITE:Int;
+  @:native("SQLITE_OPEN_CREATE")
+  static var SQLITE_OPEN_CREATE:Int;
   @:native("sqlite3_open")
   static function sqlite3_open(filename:ConstCharStar,
     db:RawPointer<RawPointer<RawSQLite>>):Int;

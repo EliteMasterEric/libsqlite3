@@ -3,7 +3,6 @@ package cases;
 import haxe.PosInfos;
 import sqlite.SQLite;
 import sqlite.SQLiteException;
-import sqlite.SQLiteExtendedResultCode;
 import sqlite.SQLiteResultCode;
 import sys.FileSystem;
 import utest.Assert;

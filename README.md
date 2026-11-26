@@ -57,7 +57,7 @@ var bytes = file.toBytes(); // or sys.io.File.getBytes("example.db")
 file.close();
 
 var db = SQLite.openFromBytes(bytes); // writable, grows as needed
-var readOnly = SQLite.openFromBytes(bytes, true); // writes throw a READONLY exception
+var readOnly = SQLite.openFromBytes(bytes, {readOnly: true}); // writes throw a READONLY exception
 ```
 
 Empty bytes give an empty database. Bytes that aren't a database throw `NOTADB` on the first statement that reads them (not when the database is loaded).

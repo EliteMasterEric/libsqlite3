@@ -3,6 +3,8 @@ package sqlite;
 #if cpp
 import cpp.RawPointer;
 import haxe.Exception;
+// Also imports SQLiteExtendedResultCode, which is declared in the same module.
+import sqlite.SQLiteResultCode;
 import sqlite._internal.RawSQLite;
 import sqlite._internal.RawSQLite.*;
 
