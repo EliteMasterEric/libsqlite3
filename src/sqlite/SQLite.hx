@@ -14,6 +14,26 @@ import sqlite._internal.RawSQLite.*;
 class SQLite
 {
   /**
+   * The version of the SQLite library compiled into this build, such as `"3.54.1"`.
+   */
+  public static var version(get, never):String;
+
+  /**
+   * The SQLite library version as one number: `major * 1000000 + minor * 1000 + patch`, such as `3054001`.
+   */
+  public static var versionNumber(get, never):Int;
+
+  static function get_version():String
+  {
+    return sqlite3_libversion();
+  }
+
+  static function get_versionNumber():Int
+  {
+    return sqlite3_libversion_number();
+  }
+
+  /**
    * Opens the database file at `path`, creating it if it doesn't exist (see `createIfMissing`).
    *
    * @param path The database file.
