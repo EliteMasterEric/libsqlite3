@@ -109,46 +109,53 @@ class SQLiteStatement
   }
 
   /**
-   * Bind the `index`th parameter with the provided value, as a 32-bit number.
+   * Bind the `index`th parameter with the provided value, as a 32-bit number (or `NULL` if the input is null).
    * 
    * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if `index` is out of range, `MISUSE` if the statement has run since `reset()`.
    */
-  public function bindInt(index:Int, value:Int):SQLiteStatement
+  public function bindInt(index:Int, value:Null<Int>):SQLiteStatement
   {
-    checkOpen();
+    checkBindable(index);
+    // Nullable, since on hxcpp a null passed as a plain Int silently becomes 0.
+    if (value == null) return bindNull(index);
 
     var result:SQLiteResultCode = sqlite3_bind_int(statement.raw, index, value);
-    if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
+    checkBindResult(result);
 
     return this;
   }
 
   /**
-   * Bind the `index`th parameter with the provided value, as a 64-bit number.
+   * Bind the `index`th parameter with the provided value, as a 64-bit number (or `NULL` if the input is null).
    * 
    * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if `index` is out of range, `MISUSE` if the statement has run since `reset()`.
    */
-  public function bindInt64(index:Int, value:Int64):SQLiteStatement
+  public function bindInt64(index:Int, value:Null<Int64>):SQLiteStatement
   {
-    checkOpen();
+    checkBindable(index);
+    if (value == null) return bindNull(index);
 
     var result:SQLiteResultCode = sqlite3_bind_int64(statement.raw, index, value);
-    if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
+    checkBindResult(result);
 
     return this;
   }
 
   /**
-   * Bind the `index`th parameter with the provided value, as a floating point value.
+   * Bind the `index`th parameter with the provided value, as a floating point value (or `NULL` if the input is null).
    * 
    * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if `index` is out of range, `MISUSE` if the statement has run since `reset()`.
    */
-  public function bindFloat(index:Int, value:Float):SQLiteStatement
+  public function bindFloat(index:Int, value:Null<Float>):SQLiteStatement
   {
-    checkOpen();
+    checkBindable(index);
+    if (value == null) return bindNull(index);
 
     var result:SQLiteResultCode = sqlite3_bind_double(statement.raw, index, value);
-    if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
+    checkBindResult(result);
 
     return this;
   }
@@ -157,10 +164,11 @@ class SQLiteStatement
    * Bind the `index`th parameter with the provided value, as a string (or `NULL` if the input is null).
    * 
    * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if `index` is out of range, `MISUSE` if the statement has run since `reset()`.
    */
   public function bindString(index:Int, value:Null<String>):SQLiteStatement
   {
-    checkOpen();
+    checkBindable(index);
     if (value == null) return bindNull(index);
 
     // Convert the string to bytes to prevent issues with 0x0 / non-ASCII characters.
@@ -168,13 +176,13 @@ class SQLiteStatement
     if (utf8.length == 0)
     {
       var result:SQLiteResultCode = sqlite3_bind_text(statement.raw, index, "", 0, SQLITE_TRANSIENT);
-      if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
+      checkBindResult(result);
     }
     else
     {
       var p:Pointer<Char> = NativeArray.address(utf8.getData(), 0).reinterpret();
       var result:SQLiteResultCode = sqlite3_bind_text(statement.raw, index, cast p.raw, utf8.length, SQLITE_TRANSIENT);
-      if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
+      checkBindResult(result);
     }
     return this;
   }
@@ -183,10 +191,11 @@ class SQLiteStatement
    * Bind the `index`th parameter with the provided value, as a binary blob (or `NULL` if the input is null).
    * 
    * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if `index` is out of range, `MISUSE` if the statement has run since `reset()`.
    */
   public function bindBytes(index:Int, value:Null<Bytes>):SQLiteStatement
   {
-    checkOpen();
+    checkBindable(index);
     if (value == null) return bindNull(index);
 
     var result:SQLiteResultCode;
@@ -200,7 +209,7 @@ class SQLiteStatement
       var p:Pointer<cpp.Void> = NativeArray.address(value.getData(), 0).reinterpret();
       result = sqlite3_bind_blob(statement.raw, index, p.raw, value.length, SQLITE_TRANSIENT);
     }
-    if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
+    checkBindResult(result);
     return this;
   }
 
@@ -208,14 +217,418 @@ class SQLiteStatement
    * Binds the `index`th parameter with `NULL`.
    *
    * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if `index` is out of range, `MISUSE` if the statement has run since `reset()`.
    */
   public function bindNull(index:Int):SQLiteStatement
   {
-    checkOpen();
+    checkBindable(index);
 
     var result:SQLiteResultCode = sqlite3_bind_null(statement.raw, index);
-    if (result != SQLiteResultCode.OK) throw SQLiteException.fromConnection(owner.db.raw);
+    checkBindResult(result);
     return this;
+  }
+
+  /**
+   * Bind the `index`th parameter with the provided value, as `TRUE` or `FALSE` (or `NULL`).
+   * The type in the table will be `INTEGER` since there is no boolean type.
+   *
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if `index` is out of range, `MISUSE` if the statement has run since `reset()`.
+   */
+  public function bindBool(index:Int, value:Null<Bool>):SQLiteStatement
+  {
+    if (value == null) return bindNull(index);
+    return bindInt(index, value ? 1 : 0);
+  }
+
+  /**
+   * Check before binding a numbered parameter, and provide a specific error message if it fails.
+   */
+  private function checkBindable(index:Int):Void
+  {
+    checkOpen();
+    var parameterCount:Int = sqlite3_bind_parameter_count(statement.raw);
+    if (index < 1 || index > parameterCount)
+    {
+      throw new SQLiteException(
+        'Parameter index $index is out of range; the statement has $parameterCount parameters, numbered from 1',
+        SQLiteResultCode.RANGE
+      );
+    }
+  }
+
+  /**
+   * Throws the error from a failed `sqlite3_bind_*` call.
+   */
+  private function checkBindResult(result:SQLiteResultCode):Void
+  {
+    if (result == SQLiteResultCode.OK) return;
+
+    // MISUSE indicates the statement was already executed and needs to be reset.
+    // sqlite3_stmt_busy() only returns true if the statement is CURRENTLY running so this is the next best thing.
+    if (result == SQLiteResultCode.MISUSE)
+    {
+      throw new SQLiteException("Cannot bind while the statement is running or after it has run; call reset() first", SQLiteResultCode.MISUSE);
+    }
+    throw SQLiteException.fromConnection(owner.db.raw);
+  }
+
+  /**
+   * Bind the named parameter with the provided value, as a 32-bit number (or `NULL` if the input is null).
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name.
+   */
+  public function bindIntByName(name:String, value:Null<Int>):SQLiteStatement
+  {
+    return bindInt(parameterIndex(name), value);
+  }
+
+  /**
+   * Bind the named parameter with the provided value, as a 64-bit number (or `NULL` if the input is null).
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name.
+   */
+  public function bindInt64ByName(name:String, value:Null<Int64>):SQLiteStatement
+  {
+    return bindInt64(parameterIndex(name), value);
+  }
+
+  /**
+   * Bind the named parameter with the provided value, as a floating point value (or `NULL` if the input is null).
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name.
+   */
+  public function bindFloatByName(name:String, value:Null<Float>):SQLiteStatement
+  {
+    return bindFloat(parameterIndex(name), value);
+  }
+
+  /**
+   * Bind the named parameter with the provided value, as a string (or `NULL` if the input is null).
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name.
+   */
+  public function bindStringByName(name:String, value:Null<String>):SQLiteStatement
+  {
+    return bindString(parameterIndex(name), value);
+  }
+
+  /**
+   * Bind the named parameter with the provided value, as a binary blob (or `NULL` if the input is null).
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name.
+   */
+  public function bindBytesByName(name:String, value:Null<Bytes>):SQLiteStatement
+  {
+    return bindBytes(parameterIndex(name), value);
+  }
+
+  /**
+   * Binds the named parameter with `NULL`.
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name.
+   */
+  public function bindNullByName(name:String):SQLiteStatement
+  {
+    return bindNull(parameterIndex(name));
+  }
+
+  /**
+   * Bind the named parameter with the provided value, as `TRUE` or `FALSE` (or `NULL` if the input is null).
+   * The table stores the value as an integer.
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name.
+   */
+  public function bindBoolByName(name:String, value:Null<Bool>):SQLiteStatement
+  {
+    return bindBool(parameterIndex(name), value);
+  }
+
+  /**
+   * Bind the `index`th parameter with the provided value.
+   * The type of `value` is checked at runtime and the appropriate function is called.
+   *
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `MISUSE` if the value has another type.
+   */
+  public function bind(index:Int, value:Any):SQLiteStatement
+  {
+    return bindValue(index, toBindValue(value));
+  }
+
+  /**
+   * Choose the bind for a value from its runtime type.
+   * This allows `bindAll()` to check every value before binding anything.
+   */
+  private static function toBindValue(value:Any):BindValue
+  {
+    // Type.typeof() tells Int and Float apart on hxcpp, Std.isOfType does not.
+    switch (Type.typeof(value))
+    {
+      case TNull:
+        return BNull;
+      case TInt:
+        return BInt(value);
+      case TFloat:
+        return BFloat(value);
+      case TBool:
+        return BInt((value : Bool) ? 1 : 0);
+      case TClass(_) if (value is String):
+        return BString(value);
+      case TClass(_) if (value is Bytes):
+        return BBytes(value);
+      // An Int64 that fits in 32 bits is a TInt; only larger ones get here.
+      case TClass(_) if (Int64.isInt64(value)):
+        return BInt64(value);
+      case other:
+        throw new SQLiteException('Can\'t bind a value of type $other; use Int, Int64, Float, Bool, String, Bytes or null', SQLiteResultCode.MISUSE);
+    }
+  }
+
+  /**
+   * Bind a value appropriately based on its type.
+   */
+  private function bindValue(index:Int, value:BindValue):SQLiteStatement
+  {
+    return switch (value)
+    {
+      case BNull:
+        bindNull(index);
+      case BInt(v):
+        bindInt(index, v);
+      case BInt64(v):
+        bindInt64(index, v);
+      case BFloat(v):
+        bindFloat(index, v);
+      case BString(v):
+        bindString(index, v);
+      case BBytes(v):
+        bindBytes(index, v);
+    }
+  }
+
+  /**
+   * Bind the named parameter with the provided value.
+   * The type of `value` is checked at runtime and the appropriate function is called.
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name,
+   *   `MISUSE` if the value has a type `bind()` doesn't support.
+   */
+  public function bindByName(name:String, value:Any):SQLiteStatement
+  {
+    return bind(parameterIndex(name), value);
+  }
+
+  /**
+   * Bind the `index`th parameter with the provided value, converted to JSON text (or `NULL` if the input is null).
+   *
+   * Wrap the parameter in `json(?)` in the SQL query to perform json operations on it.
+   * NOTE: Don't pass a `String` in here, or else it will be JSON.stringify'd twice.
+   *
+   * @return Self, for chaining calls.
+   */
+  public function bindJson(index:Int, value:Any):SQLiteStatement
+  {
+    return bindString(index, value == null ? null : haxe.Json.stringify(value));
+  }
+
+  /**
+   * Bind the named parameter with the provided value, converted to JSON text.
+   *
+   * @param name The parameter's name including its prefix, such as `":id"`, `"@id"` or `"$id"`.
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the statement has no parameter with that name.
+   */
+  public function bindJsonByName(name:String, value:Any):SQLiteStatement
+  {
+    return bindJson(parameterIndex(name), value);
+  }
+
+  /**
+   * Bind every parameter in order, `values[0]` to parameter 1 and so on.
+   * The type of `value` is checked at runtime and the appropriate function is called.
+   * Named parameters are numbered in order of first appearance, so this binds them too.
+   *
+   * Every value is checked before any is bound, so an error leaves the earlier bindings in place.
+   *
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if the number of values doesn't match the number of parameters,
+   *   `MISUSE` if a value has a type `bind()` doesn't support.
+   */
+  public function bindAll(values:Array<Any>):SQLiteStatement
+  {
+    checkOpen();
+    if (values == null) throw new SQLiteException("Values array is null", SQLiteResultCode.MISUSE);
+    // An unbound parameter would silently keep its previous value (or NULL), so require one value for each.
+    var parameterCount:Int = sqlite3_bind_parameter_count(statement.raw);
+    if (values.length != parameterCount)
+    {
+      throw new SQLiteException('Got ${values.length} values for a statement with $parameterCount parameters', SQLiteResultCode.RANGE);
+    }
+
+    var bindValues:Array<BindValue> = [for (value in values) toBindValue(value)];
+    for (i => value in bindValues)
+    {
+      bindValue(i + 1, value);
+    }
+    return this;
+  }
+
+  /**
+   * Bind every parameter by name.
+   * The map must have exactly one value for each named parameter, with names including their prefix.
+   * Example: `[":name" => "Bob", ":age" => 25]`.
+   * Every pair is checked before any is bound, so an error leaves the earlier bindings in place.
+   *
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if a parameter has no value, a name isn't a parameter of the statement,
+   *   or the statement has a positional parameter (bind those with `bindAll()` or `bind()`).
+   *   `MISUSE` if a value has a type `bind()` doesn't support.
+   */
+  public function bindAllByName(values:Map<String, Any>):SQLiteStatement
+  {
+    checkOpen();
+    if (values == null) throw new SQLiteException("Values map is null", SQLiteResultCode.MISUSE);
+
+    // Names are matched only by SQLite, never by looking up a name SQLite returns in a Map or object:
+    // on hxcpp 4.3.2, hashed lookups of equal non-ASCII strings can fail depending on how each string was made.
+    var bindings:Array<Binding> = [for (name => value in values) {
+      index: parameterIndex(name),
+      value: toBindValue(value)
+    }];
+    checkEveryParameterBound(bindings);
+
+    for (binding in bindings)
+    {
+      bindValue(binding.index, binding.value);
+    }
+    return this;
+  }
+
+  /**
+   * Bind every parameter from the fields of an anonymous structure, choosing each bind as `bind()` does.
+   * A field matches the parameter with its name and ANY prefix, so `{name: "Bob", age: 25}` binds `:name` or `@age`.
+   * 
+   * The structure must have exactly one field for each named parameter.
+   * Every field is checked before any is bound, so an error leaves the earlier bindings in place.
+   *
+   * @return Self, for chaining calls.
+   * @throws SQLiteException `RANGE` if a parameter has no field, a field doesn't match a parameter,
+   *   or the statement has a positional or numbered parameter (`?`, `?1`; bind those with `bindAll()` or `bind()`).
+   *   `MISUSE` if `values` isn't an anonymous structure, a value has a type `bind()` doesn't support,
+   *   or two parameters differ only in their prefix (such as `:name` and `@name`).
+   */
+  public function bindObject(values:Any):SQLiteStatement
+  {
+    checkOpen();
+    if (!Type.typeof(values).match(TObject))
+    {
+      throw new SQLiteException('bindObject() needs an anonymous structure, got ${Type.typeof(values)}', SQLiteResultCode.MISUSE);
+    }
+
+    // Match each field to its parameter through SQLite, as bindAllByName() does, trying every prefix.
+    var bindings:Array<Binding> = [];
+    for (field in Reflect.fields(values))
+    {
+      var index:Int = 0;
+      for (prefix in [":", "@", "$"])
+      {
+        var prefixedIndex:Int = parameterIndexOrZero(prefix + field);
+        if (prefixedIndex == 0) continue;
+        if (index != 0)
+        {
+          throw new SQLiteException('More than one parameter is named "$field" with different prefixes; bind them with bindByName()', SQLiteResultCode.MISUSE);
+        }
+        index = prefixedIndex;
+      }
+      if (index == 0) throw new SQLiteException('Field "$field" doesn\'t match a parameter', SQLiteResultCode.RANGE);
+      bindings.push({
+        index: index,
+        value: toBindValue(Reflect.field(values, field))
+      });
+    }
+    checkEveryParameterBound(bindings);
+
+    for (binding in bindings)
+    {
+      bindValue(binding.index, binding.value);
+    }
+    return this;
+  }
+
+  /**
+   * Checks that `bindings` has a value for every parameter of the statement.
+   * An unbound parameter would silently keep its previous value (or NULL).
+   *
+   * @throws SQLiteException `RANGE` if a parameter has no value, or no name (a `?`, or a gap left by a numbered parameter such as `?3`).
+   */
+  private function checkEveryParameterBound(bindings:Array<Binding>):Void
+  {
+    var parameterCount:Int = sqlite3_bind_parameter_count(statement.raw);
+    var bound:Vector<Bool> = new Vector<Bool>(parameterCount + 1);
+    for (binding in bindings)
+    {
+      bound[binding.index] = true;
+    }
+
+    for (i in 1...parameterCount + 1)
+    {
+      if (bound[i]) continue;
+      var name:Null<String> = sqlite3_bind_parameter_name(statement.raw, i);
+      if (name == null)
+      {
+        throw new SQLiteException('Parameter $i has no name; bind positional parameters with bindAll() or bind()', SQLiteResultCode.RANGE);
+      }
+      throw new SQLiteException('No value for parameter "$name"', SQLiteResultCode.RANGE);
+    }
+  }
+
+  /**
+   * Look up the numeric index of a named parameter, starting at `1`.
+   * A name used more than once in the SQL has one index, so binding it sets every use.
+   * 
+   * @throws SQLiteException `RANGE` if the statement has none with that name.
+   */
+  private function parameterIndex(name:String):Int
+  {
+    var index:Int = parameterIndexOrZero(name);
+    if (index == 0)
+    {
+      var hint:String = ~/^[:@$?]/.match(name) ? "" : '; include its prefix, such as ":$name"';
+      throw new SQLiteException('No parameter named "$name" in the statement$hint', SQLiteResultCode.RANGE);
+    }
+    return index;
+  }
+
+  /**
+   * Look up the numeric index of a named parameter, starting at `1`.
+   * 
+   * @return The index, or `0` if the statement has none with that name.
+   */
+  private function parameterIndexOrZero(name:String):Int
+  {
+    checkOpen();
+    if (name == null) throw new SQLiteException("Parameter name is null", SQLiteResultCode.MISUSE);
+    // The name is passed as a C string, which would end at a NUL and match a shorter name.
+    if (name.indexOf("\x00") != -1) throw new SQLiteException("Parameter name contains a NUL character", SQLiteResultCode.MISUSE);
+
+    return sqlite3_bind_parameter_index(statement.raw, name);
   }
 
   /**
@@ -308,8 +721,7 @@ class SQLiteStatement
       {
         // Don't leave the statement mid-execution, holding its read lock.
         reset();
-        throw new SQLiteException('Duplicate column name "$name" in the query result; give the columns distinct names with AS',
-          SQLiteResultCode.MISUSE);
+        throw new SQLiteException('Duplicate column name "$name" in the query result; give the columns distinct names with AS', SQLiteResultCode.MISUSE);
       }
       seenNames.push(name);
       columnNames[i] = name;
@@ -404,5 +816,29 @@ class SQLiteStatement
       }
     }
   }
+}
+
+/**
+ * A value to bind, associated with its type.
+ * @see `SQLiteStatement.toBindValue()`
+ */
+private enum BindValue
+{
+  BNull;
+  BInt(value:Int);
+  BInt64(value:Int64);
+  BFloat(value:Float);
+  BString(value:String);
+  BBytes(value:Bytes);
+}
+
+/**
+ * A checked value for one parameter.
+ * Functions like `bindAll()` check each value before applying.
+ */
+private typedef Binding =
+{
+  var index:Int;
+  var value:BindValue;
 }
 #end

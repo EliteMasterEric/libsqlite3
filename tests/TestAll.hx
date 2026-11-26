@@ -31,6 +31,12 @@ class TestAll
     runner.addCase(new TestExec());
     runner.addCase(new TestTransaction());
     runner.addCase(new TestIntrospection());
+    runner.addCase(new TestNamedParameters());
+    runner.addCase(new TestRuntimeBind());
+    runner.addCase(new TestBindJson());
+    runner.addCase(new TestBindAllByName());
+    runner.addCase(new TestBindChecks());
+    runner.addCase(new TestBindObject());
 
     runner.addCase(new TestUseAfterClose());
     runner.addCase(new TestNoTruncation());
@@ -49,6 +55,8 @@ class TestAll
     runner.addCase(new TestPrepareNul());
     runner.addCase(new TestPrepareTailGc());
     runner.addCase(new TestDuplicateColumnNames());
+    runner.addCase(new TestNullableNumberBind());
+    runner.addCase(new TestJsonLossyValues());
 
     Report.create(runner, SuccessResultsDisplayMode.AlwaysShowSuccessResults, HeaderDisplayMode.NeverShowHeader);
     runner.run();

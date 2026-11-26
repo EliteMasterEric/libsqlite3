@@ -39,6 +39,46 @@ class Main {
 }
 ```
 
+Parameters can also be named (`:name`, `@name` or `$name`) and bound by name, with the prefix included. A name used more than once is bound everywhere it appears.
+
+```haxe
+db.prepare("INSERT INTO Person (name, age) VALUES (:name, :age)")
+	.bindStringByName(":name", "Bob")
+	.bindIntByName(":age", 25)
+	.executeStatement();
+```
+
+`bind()`, `bindByName()` and `bindAll()` pick the bind from the value's runtime type (`Int`, `haxe.Int64`, `Float`, `Bool` as `1`/`0`, `String`, `Bytes` or `null`). `bindAll()` takes one value for each parameter, in order, and throws `RANGE` if the count doesn't match.
+
+```haxe
+db.prepare("INSERT INTO Person (name, age) VALUES (?, ?)").bindAll(["Carol", 41]).executeStatement();
+```
+
+`bindAllByName()` does the same by name, and also needs one value for each parameter:
+
+```haxe
+db.prepare("INSERT INTO Person (name, age) VALUES (:name, :age)").bindAllByName([":name" => "Dan", ":age" => 52]).executeStatement();
+```
+
+`bindObject()` binds from the fields of an anonymous structure, matching each field to the parameter with that name and any prefix:
+
+```haxe
+var insert = db.prepare("INSERT INTO Person (name, age) VALUES (:name, :age)");
+for (person in people) {
+	insert.reset().bindObject(person).executeStatement(); // {name: "Eve", age: 33}
+}
+```
+
+The bulk binds check every value before binding any, so an error leaves the earlier bindings in place. After a statement has been executed, call `reset()` before binding new values.
+
+`bindJson()` and `bindJsonByName()` bind a value as JSON text, through `haxe.Json.stringify`, for use with SQLite's JSON functions. Bound text isn't marked as JSON, so wrap the parameter in `json()` when you pass it into another JSON function. For JSON text you already have, use `bindString()`, since `bindJson()` would encode it again as a string.
+
+```haxe
+db.prepare("INSERT INTO Event (data) VALUES (json_object('tags', json(?)))").bindJson(1, ["a", "b"]).executeStatement();
+```
+
+On hxcpp, a `Float` with a whole value (such as `2.0`) is an `Int` at runtime, so these bind it as an integer. Use `bindFloat()` when the storage class matters.
+
 Column values map to Haxe types:
 
 - `INTEGER`: `Int` (or `haxe.Int64` when the value does not fit)

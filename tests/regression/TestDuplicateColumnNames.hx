@@ -51,9 +51,7 @@ class TestDuplicateColumnNames extends Test
   function testAliasedJoinWorks()
   {
     var db = joinedTables();
-    var row:Dynamic = db.prepare("SELECT p.iconId AS personIcon, i.iconId AS iconIcon FROM p JOIN i ON p.iconId = i.iconId")
-      .executeQuery()
-      .next();
+    var row:Dynamic = db.prepare("SELECT p.iconId AS personIcon, i.iconId AS iconIcon FROM p JOIN i ON p.iconId = i.iconId").executeQuery().next();
     Assert.equals(7, row.personIcon);
     Assert.equals(7, row.iconIcon);
     db.close();
@@ -86,10 +84,12 @@ class TestDuplicateColumnNames extends Test
   static function joinedTables():SQLiteDatabase
   {
     var db = SQLite.open(":memory:");
-    db.exec("CREATE TABLE p (name TEXT, iconId INTEGER);
+    db.exec(
+      "CREATE TABLE p (name TEXT, iconId INTEGER);
       CREATE TABLE i (iconId INTEGER, path TEXT);
       INSERT INTO p VALUES ('x', 7);
-      INSERT INTO i VALUES (7, 'icon.png');");
+      INSERT INTO i VALUES (7, 'icon.png');"
+    );
     return db;
   }
 

@@ -262,7 +262,8 @@ class SQLiteDatabase
    *   `SQLiteException` with `MISUSE` if the database is closed or `fn` ended the transaction,
    *   or the error from starting or committing the transaction. A failed commit is rolled back.
    */
-  public function transaction<T>(fn:() -> T, ?options:SQLiteTransactionOptions):T
+  public function transaction<T>(fn:() -> T,
+    ?options:SQLiteTransactionOptions):T
   {
     checkOpen();
     if (inTransaction()) return savepoint(fn);
@@ -300,7 +301,7 @@ class SQLiteDatabase
    */
   private function savepoint<T>(fn:() -> T):T
   {
-	// We reuse the same static name because `RELEASE` and `ROLLBACK TO` operate on the last savepoint with that name.
+    // We reuse the same static name because `RELEASE` and `ROLLBACK TO` operate on the last savepoint with that name.
     exec('SAVEPOINT $SAVEPOINT_NAME');
     var result:T;
     try

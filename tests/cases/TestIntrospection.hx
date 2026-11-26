@@ -109,14 +109,18 @@ class TestIntrospection extends Test
   function testIsReadOnlyFile()
   {
     SQLite.open(PATH).close();
-    var db = SQLite.open(PATH, {readOnly: true});
+    var db = SQLite.open(PATH, {
+      readOnly: true
+    });
     Assert.isTrue(db.isReadOnly());
     db.close();
   }
 
   function testIsReadOnlyBytes()
   {
-    var db = SQLite.openFromBytes(makeBytes(), {readOnly: true});
+    var db = SQLite.openFromBytes(makeBytes(), {
+      readOnly: true
+    });
     Assert.isTrue(db.isReadOnly());
     db.close();
   }

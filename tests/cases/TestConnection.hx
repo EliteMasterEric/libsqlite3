@@ -53,7 +53,9 @@ class TestConnection extends Test
     db.prepare("INSERT INTO t (name) VALUES ('kept')").executeStatement();
     db.close();
 
-    var readOnly = SQLite.open(PATH, {readOnly: true});
+    var readOnly = SQLite.open(PATH, {
+      readOnly: true
+    });
     var row:Dynamic = readOnly.prepare("SELECT name FROM t").executeQuery().next();
     Assert.equals("kept", row.name);
     var e = catchError(() -> readOnly.prepare("INSERT INTO t (name) VALUES ('new')").executeStatement());
@@ -65,20 +67,26 @@ class TestConnection extends Test
 
   function testReadOnlyMissingFile()
   {
-    var e = catchError(() -> SQLite.open(PATH, {readOnly: true}));
+    var e = catchError(() -> SQLite.open(PATH, {
+      readOnly: true
+    }));
     if (e != null) Assert.equals(SQLiteResultCode.CANTOPEN, e.code);
     Assert.isFalse(FileSystem.exists(PATH));
   }
 
   function testReadOnlyFalseCreatesFile()
   {
-    SQLite.open(PATH, {readOnly: false}).close();
+    SQLite.open(PATH, {
+      readOnly: false
+    }).close();
     Assert.isTrue(FileSystem.exists(PATH));
   }
 
   function testCreateIfMissingFalseThrows()
   {
-    var e = catchError(() -> SQLite.open(PATH, {createIfMissing: false}));
+    var e = catchError(() -> SQLite.open(PATH, {
+      createIfMissing: false
+    }));
     if (e != null) Assert.equals(SQLiteResultCode.CANTOPEN, e.code);
     Assert.isFalse(FileSystem.exists(PATH));
   }
@@ -86,7 +94,9 @@ class TestConnection extends Test
   function testCreateIfMissingFalseOpensExisting()
   {
     SQLite.open(PATH).close();
-    var db = SQLite.open(PATH, {createIfMissing: false});
+    var db = SQLite.open(PATH, {
+      createIfMissing: false
+    });
     db.prepare("CREATE TABLE t (x INTEGER)").executeStatement();
     db.prepare("INSERT INTO t (x) VALUES (1)").executeStatement();
     Assert.equals("1", Int64.toStr(db.changes()));
@@ -95,7 +105,10 @@ class TestConnection extends Test
 
   function testReadOnlyWithCreateIfMissingThrows()
   {
-    var e = catchError(() -> SQLite.open(PATH, {readOnly: true, createIfMissing: true}));
+    var e = catchError(() -> SQLite.open(PATH, {
+      readOnly: true,
+      createIfMissing: true
+    }));
     if (e != null) Assert.equals(SQLiteResultCode.MISUSE, e.code);
     Assert.isFalse(FileSystem.exists(PATH));
   }

@@ -89,7 +89,9 @@ class TestSerialize extends Test
     var bytes = source.toBytes();
     source.close();
 
-    var db = SQLite.openFromBytes(bytes, {readOnly: true});
+    var db = SQLite.openFromBytes(bytes, {
+      readOnly: true
+    });
     assertSample(db);
     var e = catchError(() -> db.prepare("INSERT INTO t (id) VALUES (2)").executeStatement());
     assertCodes(e, SQLiteResultCode.READONLY, SQLiteExtendedResultCode.READONLY);

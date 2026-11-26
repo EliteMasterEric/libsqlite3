@@ -100,8 +100,9 @@ class TestExec extends Test
   {
     var db = SQLite.open(":memory:");
     db.exec("CREATE TABLE t (x INTEGER)");
-    assertThrows(SQLiteResultCode.ERROR,
-      () -> db.exec("BEGIN; INSERT INTO t VALUES (1); INSERT INTO missing VALUES (2); COMMIT", {rollbackOnError: false}));
+    assertThrows(SQLiteResultCode.ERROR, () -> db.exec("BEGIN; INSERT INTO t VALUES (1); INSERT INTO missing VALUES (2); COMMIT", {
+      rollbackOnError: false
+    }));
 
     // The transaction the script started is still open.
     assertThrows(SQLiteResultCode.ERROR, () -> db.exec("BEGIN"));

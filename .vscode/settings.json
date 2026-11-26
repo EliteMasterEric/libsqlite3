@@ -1,0 +1,7 @@
+{
+  // Format Haxe files with vshaxe (haxe-formatter, configured by hxformat.json) on every save.
+  "[haxe]": {
+    "editor.defaultFormatter": "nadako.vshaxe",
+    "editor.formatOnSave": true
+  }
+}

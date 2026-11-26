@@ -36,9 +36,11 @@ class TestPreparedInnerJoin extends Test
   function testBasicInnerJoinWhereOr()
   {
     var db = SQLite.open("persons.db");
-    var stmt = db.prepare("SELECT Person.*, Icon.path FROM Person
+    var stmt = db.prepare(
+      "SELECT Person.*, Icon.path FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
-        WHERE personId = ? OR personId = ?");
+        WHERE personId = ? OR personId = ?"
+    );
     stmt.bindInt(1, 1);
     stmt.bindInt(2, 4);
     var rs = RecordUtils.toArray(stmt.executeQuery());
@@ -63,9 +65,11 @@ class TestPreparedInnerJoin extends Test
   function testBasicInnerJoinWhereAnd()
   {
     var db = SQLite.open("persons.db");
-    var stmt = db.prepare("SELECT Person.*, Icon.path FROM Person
+    var stmt = db.prepare(
+      "SELECT Person.*, Icon.path FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
-        WHERE personId = ? AND firstName = ?");
+        WHERE personId = ? AND firstName = ?"
+    );
     stmt.bindInt(1, 1);
     stmt.bindString(2, "Ian");
     var rs = RecordUtils.toArray(stmt.executeQuery());

@@ -64,7 +64,9 @@ class TestTransaction extends Test
     db.exec("CREATE TABLE t (x INTEGER)");
     var other = SQLite.open(PATH);
 
-    db.begin({mode: SQLiteTransactionMode.IMMEDIATE});
+    db.begin({
+      mode: SQLiteTransactionMode.IMMEDIATE
+    });
     assertThrows(SQLiteResultCode.BUSY, () -> other.exec("INSERT INTO t VALUES (1)"));
     db.commit();
 
@@ -154,7 +156,9 @@ class TestTransaction extends Test
           db.exec("INSERT INTO missing VALUES (3)");
         });
       }
-      catch (e:SQLiteException) {}
+      catch (e:SQLiteException)
+      {
+      }
       db.transaction(() -> db.exec("INSERT INTO t VALUES (4)"));
     });
     Assert.equals(2, countRows(db));
@@ -189,9 +193,9 @@ class TestTransaction extends Test
   function testFailedCommitRollsBack()
   {
     var db = SQLite.open(":memory:");
-    db.exec("PRAGMA foreign_keys = ON;"
-      + "CREATE TABLE parent (id INTEGER PRIMARY KEY);"
-      + "CREATE TABLE t (x INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED)");
+    db.exec(
+      "PRAGMA foreign_keys = ON;" + "CREATE TABLE parent (id INTEGER PRIMARY KEY);" + "CREATE TABLE t (x INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED)"
+    );
     // The deferred foreign key is checked only at COMMIT, which fails and leaves the transaction open.
     assertThrows(SQLiteResultCode.CONSTRAINT, () -> db.transaction(() -> db.exec("INSERT INTO t VALUES (1)")));
     Assert.equals(0, countRows(db));
