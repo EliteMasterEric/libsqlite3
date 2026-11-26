@@ -30,6 +30,7 @@ class TestAll
     runner.addCase(new TestSerialize());
     runner.addCase(new TestExec());
     runner.addCase(new TestTransaction());
+    runner.addCase(new TestIntrospection());
 
     runner.addCase(new TestUseAfterClose());
     runner.addCase(new TestNoTruncation());

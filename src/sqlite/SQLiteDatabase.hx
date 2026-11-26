@@ -201,7 +201,7 @@ class SQLiteDatabase
     terminated.set(length, 0);
     var start:Pointer<Char> = NativeArray.address(terminated.getData(), 0).reinterpret();
 
-    var wasInTransaction = sqlite3_get_autocommit(db.raw) == 0;
+    var wasInTransaction = inTransaction();
     var result:SQLiteResultCode = sqlite3_exec(db.raw, cast start.raw, null, null, null);
     if (result != SQLiteResultCode.OK)
     {
@@ -265,7 +265,7 @@ class SQLiteDatabase
   public function transaction<T>(fn:() -> T, ?options:SQLiteTransactionOptions):T
   {
     checkOpen();
-    if (sqlite3_get_autocommit(db.raw) == 0) return savepoint(fn);
+    if (inTransaction()) return savepoint(fn);
 
     begin(options);
     var result:T;
@@ -279,7 +279,7 @@ class SQLiteDatabase
       throw e;
     }
 
-    if (sqlite3_get_autocommit(db.raw) != 0)
+    if (!inTransaction())
     {
       throw new SQLiteException("The transaction was ended inside transaction()", SQLiteResultCode.MISUSE);
     }
@@ -310,7 +310,7 @@ class SQLiteDatabase
     catch (e:Exception)
     {
       // If SQLite rolled back the whole transaction after the error, the savepoint is already gone.
-      if (sqlite3_get_autocommit(db.raw) == 0)
+      if (inTransaction())
       {
         sqlite3_exec(db.raw, 'ROLLBACK TO $SAVEPOINT_NAME; RELEASE $SAVEPOINT_NAME', null, null, null);
       }
@@ -331,7 +331,7 @@ class SQLiteDatabase
    */
   private function rollbackIfOpen():Void
   {
-    if (sqlite3_get_autocommit(db.raw) == 0) sqlite3_exec(db.raw, "ROLLBACK", null, null, null);
+    if (inTransaction()) sqlite3_exec(db.raw, "ROLLBACK", null, null, null);
   }
 
   /**
@@ -375,6 +375,60 @@ class SQLiteDatabase
 
     return sqlite3_changes64(db.raw);
   }
+
+  /**
+   * @return The number of rows changed by every `INSERT`, `UPDATE` and `DELETE` since the connection opened,
+   *   where `changes()` counts only the most recent statement.
+   * @throws SQLiteException `MISUSE` if the database is closed.
+   */
+  public function totalChanges():Int64
+  {
+    checkOpen();
+    return sqlite3_total_changes64(db.raw);
+  }
+
+  /**
+   * @return Whether a transaction is open, from `begin()`, `transaction()` or a `BEGIN` statement.
+   * @throws SQLiteException `MISUSE` if the database is closed.
+   */
+  public function inTransaction():Bool
+  {
+    checkOpen();
+    // SQLite is in autocommit mode whenever no transaction is open.
+    return sqlite3_get_autocommit(db.raw) == 0;
+  }
+
+  /**
+   * @return The absolute path of the main database file,
+   *   or an empty string for an in-memory database (`":memory:"` or `SQLite.openFromBytes()`).
+   * @throws SQLiteException `MISUSE` if the database is closed.
+   */
+  public function filename():String
+  {
+    checkOpen();
+    var name:Null<String> = sqlite3_db_filename(db.raw, "main");
+    // SQLite may return either NULL or "" for an in-memory database.
+    return name ?? "";
+  }
+
+  /**
+   * @return Whether the main database is read-only, from `SQLiteOpenOptions.readOnly`.
+   * @throws SQLiteException `MISUSE` if the database is closed.
+   */
+  public function isReadOnly():Bool
+  {
+    checkOpen();
+    var result = sqlite3_db_readonly(db.raw, "main");
+    // -1 means there is no database by that name, which can't happen for "main".
+    if (result < 0) throw new SQLiteException("The main database is missing", SQLiteResultCode.INTERNAL);
+    // SQLite reports a database loaded with `SQLITE_DESERIALIZE_READONLY` as writable, so check that separately.
+    return result == 1 || deserializedReadOnly;
+  }
+
+  /**
+   * Whether `deserialize` loaded the main database read-only.
+   */
+  private var deserializedReadOnly:Bool = false;
 
   /**
    * Exports the main database into `Bytes`, in the SQLite file format.
@@ -457,6 +511,7 @@ class SQLiteDatabase
       if (error.code != result) error = new SQLiteException(sqlite3_errstr(result), result);
       throw error;
     }
+    deserializedReadOnly = readOnly;
   }
 
   /**

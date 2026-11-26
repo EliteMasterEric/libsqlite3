@@ -85,4 +85,17 @@ var readOnly = SQLite.openFromBytes(bytes, {readOnly: true}); // writes throw a 
 
 Empty bytes give an empty database. Bytes that aren't a database throw `NOTADB` on the first statement that reads them (not when the database is loaded).
 
+### Connection info
+
+```haxe
+SQLite.version; // "3.54.1"
+SQLite.versionNumber; // 3054001
+
+db.filename(); // absolute path of the file, or "" for in-memory databases
+db.isReadOnly(); // true when opened with {readOnly: true}
+db.inTransaction(); // true between begin() and commit()/rollback(), and inside transaction()
+db.changes(); // rows changed by the last statement
+db.totalChanges(); // rows changed since the connection opened
+```
+
 Errors are thrown as `sqlite.SQLiteException`, which carries SQLite's result code.
