@@ -16,7 +16,7 @@ class TestInnerJoin extends Test
   function testBasicInnerJoin()
   {
     var db = SQLite.open("persons.db");
-    var stmt = db.prepare("SELECT * FROM Person
+    var stmt = db.prepare("SELECT Person.*, Icon.path FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
         ");
     var rs = RecordUtils.toArray(stmt.executeQuery());
@@ -41,7 +41,7 @@ class TestInnerJoin extends Test
   function testBasicInnerJoinWhere()
   {
     var db = SQLite.open("persons.db");
-    var stmt = db.prepare("SELECT * FROM Person
+    var stmt = db.prepare("SELECT Person.*, Icon.path FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
         WHERE personId = 1");
     var rs = RecordUtils.toArray(stmt.executeQuery());
@@ -60,7 +60,7 @@ class TestInnerJoin extends Test
   function testBasicInnerJoinWhereOr()
   {
     var db = SQLite.open("persons.db");
-    var stmt = db.prepare("SELECT * FROM Person
+    var stmt = db.prepare("SELECT Person.*, Icon.path FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
         WHERE personId = 1 OR personId = 4");
     var rs = RecordUtils.toArray(stmt.executeQuery());
@@ -85,7 +85,7 @@ class TestInnerJoin extends Test
   function testBasicInnerJoinWhereAnd()
   {
     var db = SQLite.open("persons.db");
-    var stmt = db.prepare("SELECT * FROM Person
+    var stmt = db.prepare("SELECT Person.*, Icon.path FROM Person
             INNER JOIN Icon ON Person.iconId = Icon.iconId
         WHERE personId = 1 AND firstName = 'Ian'");
     var rs = RecordUtils.toArray(stmt.executeQuery());

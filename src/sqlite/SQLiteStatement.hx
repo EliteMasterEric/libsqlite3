@@ -286,6 +286,7 @@ class SQLiteStatement
    * 
    * @returns An `Iterator<Dynamic>` over each row in the query results.
    * 	 The rows are anonymous structures, where each column is a field on the object.
+   * @throws SQLiteException `MISUSE` if two result columns have the same name (such as from a join), use `AS` to alias.
    */
   public function executeQuery():Iterator<Dynamic>
   {
@@ -298,9 +299,20 @@ class SQLiteStatement
     // Read the columns after the first step, since that step recompiles the statement if the schema changed.
     var columnCount = sqlite3_column_count(statement.raw);
     var columnNames = new Vector<String>(columnCount);
+    var seenNames:Array<String> = [];
     for (i in 0...columnCount)
     {
-      columnNames[i] = sqlite3_column_name(statement.raw, i);
+      var name:String = sqlite3_column_name(statement.raw, i);
+      // Rows are keyed by column name, so a second column with the same name would overwrite the first.
+      if (seenNames.contains(name))
+      {
+        // Don't leave the statement mid-execution, holding its read lock.
+        reset();
+        throw new SQLiteException('Duplicate column name "$name" in the query result; give the columns distinct names with AS',
+          SQLiteResultCode.MISUSE);
+      }
+      seenNames.push(name);
+      columnNames[i] = name;
     }
 
     // An error fetching the next row is kept and thrown by the next `hasNext()` or `next()` call,

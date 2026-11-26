@@ -48,6 +48,7 @@ class TestAll
     runner.addCase(new TestStepErrorFlag());
     runner.addCase(new TestPrepareNul());
     runner.addCase(new TestPrepareTailGc());
+    runner.addCase(new TestDuplicateColumnNames());
 
     Report.create(runner, SuccessResultsDisplayMode.AlwaysShowSuccessResults, HeaderDisplayMode.NeverShowHeader);
     runner.run();

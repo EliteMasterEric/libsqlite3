@@ -47,6 +47,8 @@ Column values map to Haxe types:
 - `BLOB`: `haxe.io.Bytes`
 - `NULL`: `null`
 
+Rows are keyed by column name, so `executeQuery()` throws `MISUSE` if two result columns share a name, such as `SELECT * FROM Person JOIN Icon` when both tables have an `iconId`. Give the columns distinct names with `AS`, or select only the columns you need.
+
 `prepare()` takes exactly one statement. To run a script of several statements with no parameters, such as pragmas or schema setup, use `exec()`. Rows that the script returns are discarded.
 
 ```haxe
