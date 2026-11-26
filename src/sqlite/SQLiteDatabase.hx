@@ -96,6 +96,14 @@ class SQLiteDatabase
     db = null;
   }
 
+  /**
+   * Prepare a single SQL statement, to bind arguments and execute.
+   * NOTE: Only allows one line of SQL. Use `exec()` to run multiple statements at once (but without being able to bind values).
+   * NOTE: Since this compiles a statement, you should store and reuse it (with `reset()` and `clearBindings()`) if you plan to run it later.
+   * 
+   * @param sql The statement to prepare.
+   * @return An `SQLiteStatement` that can be executed later.
+   */
   public function prepare(sql:String):SQLiteStatement
   {
     checkOpen();
@@ -134,6 +142,7 @@ class SQLiteDatabase
         sqlite3_finalize(rawStatement);
         var message = 'Only one statement can be prepared at a time, but found more: "${utf8.getString(offset, length - offset)}"';
         if (error != null) message += ' ($error)';
+        message += '. Use exec() to run several statements without parameters.';
         throw new SQLiteException(message, SQLiteResultCode.MISUSE);
       }
 
@@ -158,6 +167,53 @@ class SQLiteDatabase
 
     statements.push(new WeakRef(stmt));
     return stmt;
+  }
+
+  /**
+   * Runs a script of one or more SQL statements in order, such as pragmas or schema creation.
+   * 
+   * The script CANNOT have bound parameters, and rows returned by its statements are discarded.
+   * Use `prepare()` to run a single statement that needs parameters or returns rows.
+   *
+   * If a statement fails, the script stops there.
+   * The statements before it stay applied unless they are in a transaction that gets rolled back (see `SQLiteExecOptions.rollbackOnError`).
+   *
+   * @param sql The statements, separated by semicolons.
+   * @param options See `SQLiteExecOptions`.
+   * @throws SQLiteException `MISUSE` if the database is closed, or if `sql` is invalid (empty, only whitespace, contains a NUL character).
+   *   Otherwise the error SQLite reports for the statement that failed.
+   */
+  public function exec(sql:String, ?options:SQLiteExecOptions):Void
+  {
+    checkOpen();
+    if (StringTools.trim(sql) == "") throw new SQLiteException("No SQL statement to execute", SQLiteResultCode.MISUSE);
+
+    // `sqlite3_exec` reads up to a NUL, so a NUL inside the SQL would silently drop the rest of the script.
+    var utf8 = Bytes.ofString(sql);
+    var length = utf8.length;
+    for (i in 0...length)
+    {
+      if (utf8.get(i) == 0) throw new SQLiteException("SQL must not contain a NUL character", SQLiteResultCode.MISUSE);
+    }
+    var terminated = Bytes.alloc(length + 1);
+    terminated.blit(0, utf8, 0, length);
+    terminated.set(length, 0);
+    var start:Pointer<Char> = NativeArray.address(terminated.getData(), 0).reinterpret();
+
+    var wasInTransaction = sqlite3_get_autocommit(db.raw) == 0;
+    var result:SQLiteResultCode = sqlite3_exec(db.raw, cast start.raw, null, null, null);
+    if (result != SQLiteResultCode.OK)
+    {
+      // Read the error first, since the rollback replaces it.
+      var error = SQLiteException.fromConnection(db.raw);
+      // Roll back a transaction the script started but didn't finish. A transaction the caller started is left alone.
+      // If the rollback itself fails, the original error is still the one worth reporting.
+      if ((options?.rollbackOnError ?? true) && !wasInTransaction && sqlite3_get_autocommit(db.raw) == 0)
+      {
+        sqlite3_exec(db.raw, "ROLLBACK", null, null, null);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -294,5 +350,21 @@ class SQLiteDatabase
   {
     if (db == null) throw new SQLiteException("Database is closed", SQLiteResultCode.MISUSE);
   }
+}
+
+/**
+ * Options for `SQLiteDatabase.exec()`.
+ */
+typedef SQLiteExecOptions =
+{
+  /**
+   * If `true` and a statement fails while a transaction the script started is still open
+   * (such as between its `BEGIN` and `COMMIT`), that transaction is rolled back.
+   * A transaction that was already open when `exec()` was called is never rolled back.
+   * If `false`, the transaction stays open, and the caller must `COMMIT` or `ROLLBACK` it.
+   *
+   * @default `true`
+   */
+  var ?rollbackOnError:Bool;
 }
 #end

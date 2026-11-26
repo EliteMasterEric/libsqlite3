@@ -47,6 +47,15 @@ Column values map to Haxe types:
 - `BLOB`: `haxe.io.Bytes`
 - `NULL`: `null`
 
+`prepare()` takes exactly one statement. To run a script of several statements with no parameters, such as pragmas or schema setup, use `exec()`. Rows that the script returns are discarded.
+
+```haxe
+db.exec("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;");
+db.exec("BEGIN; CREATE TABLE A (x INTEGER); CREATE TABLE B (y INTEGER); PRAGMA user_version = 1; COMMIT;");
+```
+
+If a statement fails, the script stops there, and `exec()` rolls back any transaction that the script opened and didn't finish. Pass `{rollbackOnError: false}` to leave that transaction open.
+
 ### In-memory databases from bytes
 
 `toBytes()` exports a database in the SQLite `.db` file format, and `SQLite.openFromBytes()` lets you load a database from memory, without having to touch the file system.
