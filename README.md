@@ -56,6 +56,20 @@ db.exec("BEGIN; CREATE TABLE A (x INTEGER); CREATE TABLE B (y INTEGER); PRAGMA u
 
 If a statement fails, the script stops there, and `exec()` rolls back any transaction that the script opened and didn't finish. Pass `{rollbackOnError: false}` to leave that transaction open.
 
+### Transactions
+
+`transaction()` runs a function in a transaction. It commits when the function returns, and rolls back and rethrows when it throws. It returns the function's result.
+
+```haxe
+var eventId = db.transaction(() -> {
+	db.prepare("INSERT INTO Event (name) VALUES (?)").bindString(1, "screenshot").executeStatement();
+	db.prepare("UPDATE Session SET lastSeen = ?").bindInt(1, 1234).executeStatement();
+	return db.lastInsertRowId();
+}, {mode: SQLiteTransactionMode.IMMEDIATE}); // import sqlite.SQLiteTransactionMode
+```
+
+A `transaction()` call inside another one, or after `begin()`, uses a savepoint, so a failure undoes only its own work. For manual control, use `begin()`, `commit()` and `rollback()`.
+
 ### In-memory databases from bytes
 
 `toBytes()` exports a database in the SQLite `.db` file format, and `SQLite.openFromBytes()` lets you load a database from memory, without having to touch the file system.

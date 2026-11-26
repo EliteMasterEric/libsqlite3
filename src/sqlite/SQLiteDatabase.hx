@@ -11,6 +11,7 @@ import cpp.Stdlib;
 import cpp.UInt8;
 import cpp.vm.Gc;
 import cpp.vm.WeakRef;
+import haxe.Exception;
 import haxe.Int64;
 import haxe.io.Bytes;
 import sqlite._internal.RawSQLite;
@@ -207,13 +208,130 @@ class SQLiteDatabase
       // Read the error first, since the rollback replaces it.
       var error = SQLiteException.fromConnection(db.raw);
       // Roll back a transaction the script started but didn't finish. A transaction the caller started is left alone.
-      // If the rollback itself fails, the original error is still the one worth reporting.
-      if ((options?.rollbackOnError ?? true) && !wasInTransaction && sqlite3_get_autocommit(db.raw) == 0)
-      {
-        sqlite3_exec(db.raw, "ROLLBACK", null, null, null);
-      }
+      if ((options?.rollbackOnError ?? true) && !wasInTransaction) rollbackIfOpen();
       throw error;
     }
+  }
+
+  /**
+   * Starts a transaction.
+   * @see `commit()` or `rollback()` to end a transaction.
+   * @see `transaction(fn)` for a callback that begins and commits a transaction for you.
+   *
+   * @param options See `SQLiteTransactionOptions`.
+   * @throws SQLiteException `MISUSE` if the database is closed, `ERROR` if a transaction is already open,
+   *   or `BUSY` if an `IMMEDIATE` or `EXCLUSIVE` transaction can't get its lock.
+   */
+  public function begin(?options:SQLiteTransactionOptions):Void
+  {
+    var mode = options?.mode ?? SQLiteTransactionMode.DEFERRED;
+    exec('BEGIN $mode');
+  }
+
+  /**
+   * Commits the open transaction.
+   *
+   * @throws SQLiteException `MISUSE` if the database is closed, `ERROR` if no transaction is open,
+   *   or the error that stopped the commit. A failed commit keeps the transaction open.
+   */
+  public function commit():Void
+  {
+    exec("COMMIT");
+  }
+
+  /**
+   * Rolls back the open transaction, undoing every change made in it.
+   *
+   * @throws SQLiteException `MISUSE` if the database is closed, or `ERROR` if no transaction is open.
+   */
+  public function rollback():Void
+  {
+    exec("ROLLBACK");
+  }
+
+  /**
+   * Runs `fn` in a transaction.
+   * Begins a transaction, then commits if it returns, and rolls back if it throws.
+   *
+   * Transaction calls can be nested safely thanks to savepoints!
+   *
+   * @param fn The work to do in the transaction.
+   * @param options See `SQLiteTransactionOptions`. Ignored on nested transactions.
+   * @return The value `fn` returns.
+   * @throws Whatever `fn` throws, after the transaction is rolled back.
+   *   `SQLiteException` with `MISUSE` if the database is closed or `fn` ended the transaction,
+   *   or the error from starting or committing the transaction. A failed commit is rolled back.
+   */
+  public function transaction<T>(fn:() -> T, ?options:SQLiteTransactionOptions):T
+  {
+    checkOpen();
+    if (sqlite3_get_autocommit(db.raw) == 0) return savepoint(fn);
+
+    begin(options);
+    var result:T;
+    try
+    {
+      result = fn();
+    }
+    catch (e:Exception)
+    {
+      rollbackIfOpen();
+      throw e;
+    }
+
+    if (sqlite3_get_autocommit(db.raw) != 0)
+    {
+      throw new SQLiteException("The transaction was ended inside transaction()", SQLiteResultCode.MISUSE);
+    }
+    try
+    {
+      commit();
+    }
+    catch (e:SQLiteException)
+    {
+      rollbackIfOpen();
+      throw e;
+    }
+    return result;
+  }
+
+  /**
+   * Runs `fn` inside a savepoint.
+   */
+  private function savepoint<T>(fn:() -> T):T
+  {
+	// We reuse the same static name because `RELEASE` and `ROLLBACK TO` operate on the last savepoint with that name.
+    exec('SAVEPOINT $SAVEPOINT_NAME');
+    var result:T;
+    try
+    {
+      result = fn();
+    }
+    catch (e:Exception)
+    {
+      // If SQLite rolled back the whole transaction after the error, the savepoint is already gone.
+      if (sqlite3_get_autocommit(db.raw) == 0)
+      {
+        sqlite3_exec(db.raw, 'ROLLBACK TO $SAVEPOINT_NAME; RELEASE $SAVEPOINT_NAME', null, null, null);
+      }
+      throw e;
+    }
+    // Releasing a nested savepoint keeps its changes in the outer transaction.
+    exec('RELEASE $SAVEPOINT_NAME');
+    return result;
+  }
+
+  private static inline final SAVEPOINT_NAME:String = "libsqlite3_transaction";
+
+  /**
+   * Rolls back the open transaction, if there is one, after an error.
+   * Some errors (such as `FULL`, `IOERR`, or a conflict with `OR ROLLBACK`) make SQLite roll back by itself,
+   * and `ROLLBACK` with no transaction open would fail.
+   * The result is ignored, because the error that caused the rollback is the one to report.
+   */
+  private function rollbackIfOpen():Void
+  {
+    if (sqlite3_get_autocommit(db.raw) == 0) sqlite3_exec(db.raw, "ROLLBACK", null, null, null);
   }
 
   /**
@@ -366,5 +484,18 @@ typedef SQLiteExecOptions =
    * @default `true`
    */
   var ?rollbackOnError:Bool;
+}
+
+/**
+ * Options for `SQLiteDatabase.begin()` and `SQLiteDatabase.transaction()`.
+ */
+typedef SQLiteTransactionOptions =
+{
+  /**
+   * How the transaction takes its locks. See `SQLiteTransactionMode`.
+   *
+   * @default `DEFERRED`
+   */
+  var ?mode:SQLiteTransactionMode;
 }
 #end
