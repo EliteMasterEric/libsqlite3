@@ -787,13 +787,13 @@ class SQLiteStatement
                   var textBytes:Int = sqlite3_column_bytes(statement.raw, i);
                   Reflect.setField(data, columnNames[i], NativeString.fromPointerLen(text, textBytes));
                 case BLOB:
-                  var blob:RawConstPointer<cpp.Void> = sqlite3_column_blob(statement.raw, i);
+                  var blob:RawConstPointer<cpp.UInt8> = cast sqlite3_column_blob(statement.raw, i);
                   var size:Int = sqlite3_column_bytes(statement.raw, i);
                   var bytes = Bytes.alloc(size);
                   if (size > 0)
                   {
                     var dest:Pointer<cpp.Void> = NativeArray.address(bytes.getData(), 0).reinterpret();
-                    Stdlib.nativeMemcpy(dest.raw, blob, size);
+                    Stdlib.nativeMemcpy(dest.raw, cast blob, size);
                   }
                   Reflect.setField(data, columnNames[i], bytes);
                 case NULL:

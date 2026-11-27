@@ -1,0 +1,9 @@
+common.hxml
+
+# Debug build with debugger support: every local becomes a hx::StackVariable,
+# which fails to compile for some pointer types (such as const void*).
+-debug
+-D HXCPP_DEBUGGER
+
+--cpp build/hxcpp-debugger
+--cmd .\build\hxcpp-debugger\TestAll-debug

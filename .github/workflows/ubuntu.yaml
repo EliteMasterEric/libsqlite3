@@ -14,12 +14,17 @@ jobs:
           - ubuntu-latest
         haxe:
           - 4.3.7
+        # The second entry builds with debugger support, which wraps every local
+        # in hx::StackVariable and rejects some types that release builds accept.
+        flags:
+          - ''
+          - -debug -D HXCPP_DEBUGGER
     with:
       runner-os: ${{ matrix.os }}
       haxe-version: ${{ matrix.haxe }}
       haxe-libs: |
         utest
-      test-cpp:  tests/common.hxml --class-path tests
+      test-cpp:  tests/common.hxml --class-path tests ${{ matrix.flags }}
 
       # Test the checked-out commit, not a fresh clone of the library.
       before-tests: |
