@@ -1,3 +1,4 @@
 build/
 *.db
 *.db-journal
+export_classes.info

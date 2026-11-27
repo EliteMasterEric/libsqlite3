@@ -1,9 +1,10 @@
 common.hxml
 
-# Debug build with debugger support: every local becomes a hx::StackVariable,
-# which fails to compile for some pointer types (such as const void*).
+# flags to test with a MacOS release build, with HXCPP_debugger and CPPIA scripting
+
 -debug
 -D HXCPP_DEBUGGER
+-D scriptable
 
 --cpp build/hxcpp-debugger
 --cmd ./build/hxcpp-debugger/TestAll-debug

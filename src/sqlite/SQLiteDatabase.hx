@@ -339,7 +339,7 @@ class SQLiteDatabase
    * @return How many bytes `tail` is past `start`.
    * We know the value is at least `fromOffset`.
    */
-  private static function tailOffset(start:Pointer<Char>, tail:ConstCharStar, fromOffset:Int):Int
+  private static extern inline function tailOffset(start:Pointer<Char>, tail:ConstCharStar, fromOffset:Int):Int
   {
     var offset = fromOffset;
     while ((cast start.add(offset).raw : ConstCharStar) != tail)

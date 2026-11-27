@@ -1,4 +1,6 @@
 common.hxml
 
+# flags to test with a Linux release build
+
 --cpp build/hxcpp
 --cmd ./build/hxcpp/TestAll

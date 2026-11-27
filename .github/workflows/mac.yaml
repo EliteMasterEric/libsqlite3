@@ -14,11 +14,12 @@ jobs:
           - macos-latest
         haxe:
           - 4.3.7
-        # The second entry builds with debugger support, which wraps every local
-        # in hx::StackVariable and rejects some types that release builds accept.
+        # The second entry uses the flags of a Lime debug build with cppia hosting
+        # (see tests/test-hxcpp-debugger-*.hxml), which reject some C++ that
+        # release builds accept.
         flags:
           - ''
-          - -debug -D HXCPP_DEBUGGER
+          - -debug -D HXCPP_DEBUGGER -D scriptable
     with:
       runner-os: ${{ matrix.os }}
       haxe-version: ${{ matrix.haxe }}
