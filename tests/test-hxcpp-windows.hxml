@@ -1,4 +1,6 @@
 common.hxml
 
+# flags to test with a Windows release build
+
 --cpp build/hxcpp
 --cmd .\build\hxcpp\TestAll
